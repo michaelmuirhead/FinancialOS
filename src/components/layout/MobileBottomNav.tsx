@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
-  ArrowLeftRight,
   CalendarDays,
   Home,
   Menu,
   Plus,
+  TrendingUp,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { navigation } from "./navigation";
@@ -37,9 +37,9 @@ export function MobileBottomNav() {
           <Home size={20} />
           Dashboard
         </NavLink>
-        <NavLink to="/transactions" className={itemClass}>
-          <ArrowLeftRight size={20} />
-          Activity
+        <NavLink to="/forecast" className={itemClass}>
+          <TrendingUp size={20} />
+          Forecast
         </NavLink>
         <button
           className="mobile-bottom-nav__item"
