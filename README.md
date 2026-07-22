@@ -12,7 +12,7 @@ strategies, sinking funds, and net-worth trends in one place.
 | Dashboard | Total cash, monthly income, bills paid, safe-to-spend, net worth, cash-flow forecast, alerts |
 | Paycheck Planner | Assigns every paycheck a job and shows cash remaining per check |
 | Bills & Calendar | Recurring obligations moving through Scheduled → Due Soon → Paid |
-| Transactions | The household ledger with search, categories, and statuses |
+| Transactions | The household ledger with CSV import, learned merchant rules, search, and reconciliation |
 | Budget | Planned vs. actual by category with month-end projections and 75%/90% warnings |
 | Debt Payoff | Snowball, avalanche, utilization, and custom strategies with payoff projections |
 | Sinking Funds | Christmas, car repairs, school clothes — predictable non-monthly expenses |
@@ -20,7 +20,7 @@ strategies, sinking funds, and net-worth trends in one place.
 | Net Worth | Monthly balance sheet: assets minus liabilities, with a 12-month trend |
 | Tax Center | Year-to-date income and giving, with document folders |
 | Reports | Income/expense summaries, category and merchant breakdowns, CSV export |
-| Documents | Planned household filing cabinet (Phase 3, Supabase Storage) |
+| Documents | Household filing cabinet — uploads into folders (IndexedDB in demo, Supabase Storage connected) |
 | Account Center | Registry of all accounts — no passwords or credentials stored |
 | Settings | Household rules: checking buffer, giving target, utilization warnings |
 
@@ -95,6 +95,10 @@ supabase/
    thresholds, low buffer, emergency-fund coverage, bill variance),
    automatic bill status transitions, debt strategy comparison, net-worth
    snapshots
-3. **Imports & documents:** CSV import, statement upload, reconciliation
+3. **Imports & documents (done):** CSV transaction import with column
+   auto-detection, duplicate flagging (against the ledger and within the
+   file), and rule-applied categories; merchant→category rules that learn
+   as you categorize; transaction reconciliation workflow; document
+   uploads into folders with download/delete
 4. **Intelligence:** anomaly alerts, cash-flow forecasts, monthly review
 5. **Advanced:** bank-data integration, push notifications, tax projection

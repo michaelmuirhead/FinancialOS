@@ -11,17 +11,22 @@ import {
   createGoal,
   createPaycheck,
   createTransaction,
+  deleteCategoryRule,
+  deleteDocument,
   fetchAccounts,
   fetchBillOccurrences,
   fetchBills,
   fetchCategories,
+  fetchCategoryRules,
   fetchDebts,
+  fetchDocuments,
   fetchGoals,
   fetchHousehold,
   fetchNetWorthHistory,
   fetchPaychecks,
   fetchRules,
   fetchTransactions,
+  importTransactions,
   markBillPaid,
   NewAccountInput,
   NewBillInput,
@@ -31,7 +36,12 @@ import {
   NewTransactionInput,
   recordNetWorthSnapshot,
   updateCategoryTarget,
+  updateTransactionCategory,
+  updateTransactionStatus,
+  uploadDocument,
+  upsertCategoryRule,
 } from "@/services/dataService";
+import { DocumentFolder, DocumentRecord, TransactionStatus } from "@/types";
 import { getDashboardSummary } from "@/services/dashboardService";
 
 export function useHousehold() {
@@ -154,6 +164,92 @@ export function useRecordNetWorthSnapshot() {
     mutationFn: ({ month, netWorth }: { month: string; netWorth: number }) =>
       recordNetWorthSnapshot(month, netWorth),
     onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+export function useCategoryRules() {
+  return useQuery({
+    queryKey: ["category-rules"],
+    queryFn: fetchCategoryRules,
+  });
+}
+
+export function useDocuments() {
+  return useQuery({ queryKey: ["documents"], queryFn: fetchDocuments });
+}
+
+export function useImportTransactions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: importTransactions,
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+export function useUpdateTransactionCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      transactionId,
+      categoryId,
+    }: {
+      transactionId: string;
+      categoryId: string | undefined;
+    }) => updateTransactionCategory(transactionId, categoryId),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+export function useUpdateTransactionStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      transactionId,
+      status,
+    }: {
+      transactionId: string;
+      status: TransactionStatus;
+    }) => updateTransactionStatus(transactionId, status),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+export function useUpsertCategoryRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      merchantPattern,
+      categoryId,
+    }: {
+      merchantPattern: string;
+      categoryId: string;
+    }) => upsertCategoryRule(merchantPattern, categoryId),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+export function useDeleteCategoryRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ruleId: string) => deleteCategoryRule(ruleId),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+export function useUploadDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ folder, file }: { folder: DocumentFolder; file: File }) =>
+      uploadDocument(folder, file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
+  });
+}
+
+export function useDeleteDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (document: DocumentRecord) => deleteDocument(document),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
   });
 }
 
