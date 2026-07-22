@@ -21,6 +21,7 @@ import {
   demoCategoryRules,
   demoDebts,
   demoGoals,
+  demoHistoricalTransactions,
   demoHousehold,
   demoNetWorthHistory,
   demoPaychecks,
@@ -44,7 +45,7 @@ interface DemoState {
   documents: DocumentRecord[];
 }
 
-const STORAGE_KEY = "homevault-demo-state-v3";
+const STORAGE_KEY = "homevault-demo-state-v4";
 
 function seedState(): DemoState {
   return {
@@ -54,7 +55,7 @@ function seedState(): DemoState {
     categories: demoCategories,
     bills: demoBills,
     billOccurrences: demoBillOccurrences,
-    transactions: demoTransactions,
+    transactions: [...demoTransactions, ...demoHistoricalTransactions],
     debts: demoDebts,
     goals: demoGoals,
     paychecks: demoPaychecks,

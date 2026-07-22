@@ -18,6 +18,13 @@ function isoDaysFromNow(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** Day `day` of the month `offset` months from now (offset is negative for past). */
+function isoMonthDay(offset: number, day: number): string {
+  const now = new Date();
+  const date = new Date(now.getFullYear(), now.getMonth() + offset, day, 12);
+  return date.toISOString().slice(0, 10);
+}
+
 export const demoHousehold: Household = {
   id: "hh-demo",
   name: "Muirhead Household",
@@ -528,6 +535,71 @@ export const demoTransactions: Transaction[] = [
     status: "pending",
   },
 ];
+
+/**
+ * Two months of realistic history behind the current-month transactions, so
+ * averages, anomaly detection, and subscription discovery have signal.
+ * Note the Netflix price step from $14.49 to $15.49 last month — the
+ * intelligence layer should flag it as a subscription price increase.
+ */
+function buildHistoricalTransactions(): Transaction[] {
+  const history: Transaction[] = [];
+  let sequence = 0;
+  const add = (
+    monthOffset: number,
+    day: number,
+    merchant: string,
+    amount: number,
+    transactionType: Transaction["transactionType"],
+    categoryId: string,
+    memberName?: string,
+  ) => {
+    history.push({
+      id: `htx-${monthOffset}-${sequence++}`,
+      householdId: "hh-demo",
+      accountId: "acc-checking",
+      transactionDate: isoMonthDay(monthOffset, day),
+      merchant,
+      amount,
+      transactionType,
+      categoryId,
+      memberName,
+      status: "reconciled",
+    });
+  };
+
+  for (const offset of [-2, -1]) {
+    add(offset, 1, "Employer — Michael", 2780, "income", "cat-income", "Michael");
+    add(offset, 15, "Employer — Michael", 2780, "income", "cat-income", "Michael");
+    add(offset, 7, "Employer — Deisha", 2140, "income", "cat-income", "Deisha");
+    add(offset, 21, "Employer — Deisha", 2140, "income", "cat-income", "Deisha");
+    add(offset, 2, "JNT", -278, "expense", "cat-giving");
+    add(offset, 8, "JNT", -214, "expense", "cat-giving");
+    add(offset, 1, "Rocket Mortgage", -1520, "expense", "cat-housing");
+    add(offset, 12, "Entergy", offset === -1 ? -132 : -110, "expense", "cat-utilities");
+    add(offset, 15, "Water & Sewer Dept", -68, "expense", "cat-utilities");
+    add(offset, 18, "Verizon", -142, "expense", "cat-utilities");
+    add(offset, 20, "AT&T Internet", -75, "expense", "cat-utilities");
+    add(offset, 22, "State Farm Auto", -218, "expense", "cat-insurance");
+    add(offset, 27, "Netflix", offset === -1 ? -15.49 : -14.49, "expense", "cat-subscriptions");
+    add(offset, 4, "Kroger", -168.5, "expense", "cat-groceries", "Deisha");
+    add(offset, 11, "Kroger", -155.25, "expense", "cat-groceries", "Deisha");
+    add(offset, 18, "Kroger", -172.8, "expense", "cat-groceries", "Deisha");
+    add(offset, 25, "Kroger", -149.6, "expense", "cat-groceries", "Deisha");
+    add(offset, 5, "Shell", -48.2, "expense", "cat-gas", "Michael");
+    add(offset, 12, "Shell", -51.75, "expense", "cat-gas", "Deisha");
+    add(offset, 19, "Shell", -46.9, "expense", "cat-gas", "Michael");
+    add(offset, 26, "Shell", -49.3, "expense", "cat-gas", "Deisha");
+    add(offset, 9, "Chick-fil-A", -34.2, "expense", "cat-restaurants");
+    add(offset, 16, "Sonic Drive-In", -22.15, "expense", "cat-restaurants");
+    add(offset, 23, "El Sombrero", -41.8, "expense", "cat-restaurants");
+    add(offset, 14, "Walmart", -112.4, "expense", "cat-shopping");
+    add(offset, 24, "Transfer to Emergency Fund", -300, "transfer", "cat-savings");
+  }
+  return history;
+}
+
+export const demoHistoricalTransactions = buildHistoricalTransactions();
 
 export const demoDebts: Debt[] = [
   {

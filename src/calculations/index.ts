@@ -1,5 +1,7 @@
 export * from "./alerts";
 export * from "./budgetForecast";
+export * from "./insights";
+export * from "./review";
 export * from "./cashFlow";
 export * from "./debtPayoff";
 export * from "./netWorth";

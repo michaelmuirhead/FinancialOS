@@ -9,6 +9,12 @@ import {
   Transaction,
 } from "@/types";
 import { calculateUtilization } from "./debtPayoff";
+import {
+  billLikeCategoryIds,
+  detectSubscriptions,
+  findDuplicateCharges,
+  findSpendingAnomalies,
+} from "./insights";
 import { emergencyFundCoverageMonths } from "./sinkingFunds";
 
 export interface AlertEngineInput {
@@ -158,6 +164,47 @@ export function generateAlerts(input: AlertEngineInput): FinancialAlert[] {
       priority: "info",
       title: `Emergency fund at ${coverage.toFixed(1)} months of coverage`,
       detail: `Target is ${EMERGENCY_TARGET_MONTHS} months ($${emergency.targetAmount.toLocaleString()}).`,
+      createdAt: now,
+    });
+  }
+
+  // Spending pace anomalies vs. the trailing three-month average
+  for (const anomaly of findSpendingAnomalies(
+    input.transactions,
+    input.categories,
+  )) {
+    alerts.push({
+      id: `anomaly-${anomaly.categoryId}`,
+      priority: "attention",
+      title: `Unusual ${anomaly.categoryName.toLowerCase()} spending`,
+      detail: `$${Math.round(anomaly.currentSpend).toLocaleString()} so far this month vs. a typical $${Math.round(anomaly.typicalSpend).toLocaleString()} by this point (${Math.round((anomaly.ratio - 1) * 100)}% above normal).`,
+      createdAt: now,
+    });
+  }
+
+  // Possible duplicate charges
+  for (const duplicate of findDuplicateCharges(input.transactions)) {
+    alerts.push({
+      id: `duplicate-${duplicate.merchant}-${duplicate.dates[0]}`,
+      priority: "attention",
+      title: `Possible duplicate charge at ${duplicate.merchant}`,
+      detail: `$${duplicate.amount.toLocaleString()} charged on ${duplicate.dates.join(" and ")}.`,
+      createdAt: now,
+    });
+  }
+
+  // Subscription price increases
+  for (const subscription of detectSubscriptions(
+    input.transactions,
+    billLikeCategoryIds(input.categories),
+  )) {
+    if (!subscription.priceIncreased || subscription.previousAmount == null)
+      continue;
+    alerts.push({
+      id: `sub-increase-${subscription.merchant}`,
+      priority: "info",
+      title: `${subscription.merchant} price increased`,
+      detail: `Now $${subscription.monthlyAmount.toFixed(2)}/month, up from $${subscription.previousAmount.toFixed(2)}.`,
       createdAt: now,
     });
   }

@@ -162,11 +162,14 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     .filter((o) => o.status !== "paid" && o.status !== "skipped")
     .slice(0, 6);
 
+  // 90 days of forward projection; the chart trims to its selected horizon.
   const cashFlow = buildCashFlowSeries(
     totalCash,
     transactions,
     occurrences,
     paychecks,
+    30,
+    90,
   );
 
   const budgetUsagePercent =

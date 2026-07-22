@@ -138,6 +138,51 @@ export function DebtPage() {
           )}
         </Card>
       </div>
+      <Card title="Recommendations" className="page-section">
+        <ol style={{ margin: 0, paddingLeft: "1.2rem", display: "grid", gap: 8 }}>
+          {(() => {
+            const recommendations: string[] = [];
+            const focusDebt = ordered[0];
+            if (focusDebt) {
+              recommendations.push(
+                `Focus on ${focusDebt.name} first under the ${STRATEGIES.find((s) => s.value === strategy)?.label.toLowerCase()} strategy (${focusDebt.annualInterestRate.toFixed(2)}% APR, ${formatCurrency(focusDebt.currentBalance)} balance).`,
+              );
+            }
+            for (const debt of list) {
+              if (!debt.creditLimit) continue;
+              const utilization = calculateUtilization(
+                debt.currentBalance,
+                debt.creditLimit,
+              );
+              if (utilization > 30) {
+                const target = debt.creditLimit * 0.3;
+                recommendations.push(
+                  `Pay ${formatCurrency(Math.ceil(debt.currentBalance - target))} on ${debt.name} to bring utilization from ${Math.round(utilization)}% under 30% — this typically helps your credit score.`,
+                );
+              }
+            }
+            if (list.length > 0) {
+              const baseline = projectPayoff(list, 0, strategy);
+              for (const bump of [100, 250]) {
+                const result = projectPayoff(list, bump, strategy);
+                const monthsSaved = baseline.months - result.months;
+                const interestSaved =
+                  baseline.totalInterest - result.totalInterest;
+                if (monthsSaved > 0) {
+                  recommendations.push(
+                    `An extra ${formatCurrency(bump)}/month pays everything off ${monthsSaved} month${monthsSaved === 1 ? "" : "s"} sooner and saves about ${formatCurrency(Math.round(interestSaved))} in interest.`,
+                  );
+                }
+              }
+            }
+            return recommendations.map((text, index) => (
+              <li key={index} style={{ fontSize: "0.9rem" }}>
+                {text}
+              </li>
+            ));
+          })()}
+        </ol>
+      </Card>
       <Card title="Strategy comparison" className="page-section">
         <div className="table-wrap">
           <table className="data-table">
