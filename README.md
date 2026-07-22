@@ -10,6 +10,7 @@ strategies, sinking funds, and net-worth trends in one place.
 | Module | What it does |
 | --- | --- |
 | Dashboard | Total cash, monthly income, bills paid, safe-to-spend, net worth, cash-flow forecast, alerts |
+| Forecast | Balance milestones (30/90-day, year-end, multi-year) and a day-by-day projected ledger |
 | Paycheck Planner | Assigns every paycheck a job and shows cash remaining per check |
 | Bills & Calendar | Recurring obligations moving through Scheduled → Due Soon → Paid |
 | Transactions | The household ledger with CSV import, learned merchant rules, search, and reconciliation |

@@ -12,6 +12,7 @@ import {
   Landmark,
   LucideIcon,
   PiggyBank,
+  TrendingUp,
   ReceiptText,
   Settings,
   WalletCards,
@@ -25,6 +26,7 @@ export interface NavItem {
 
 export const navigation: NavItem[] = [
   { label: "Dashboard", path: "/", icon: Home },
+  { label: "Forecast", path: "/forecast", icon: TrendingUp },
   { label: "Paycheck Planner", path: "/paychecks", icon: WalletCards },
   { label: "Bills & Calendar", path: "/bills", icon: CalendarDays },
   { label: "Transactions", path: "/transactions", icon: ArrowLeftRight },

@@ -4,6 +4,7 @@ export * from "./insights";
 export * from "./review";
 export * from "./cashFlow";
 export * from "./debtPayoff";
+export * from "./forecast";
 export * from "./netWorth";
 export * from "./paycheck";
 export * from "./safeToSpend";
