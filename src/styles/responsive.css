@@ -1,0 +1,81 @@
+/* iPad and below: collapse sidebar, two-column dashboard */
+@media (max-width: 1024px) {
+  .desktop-sidebar {
+    display: none;
+  }
+
+  .metrics-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cash-flow-panel,
+  .budget-panel,
+  .upcoming-panel,
+  .debt-panel,
+  .goals-panel,
+  .alerts-panel {
+    grid-column: span 1;
+  }
+
+  .networth-panel {
+    grid-column: span 2;
+  }
+
+  .mobile-bottom-nav {
+    display: grid;
+  }
+
+  .main-content {
+    padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 1rem);
+  }
+
+  .three-col {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* iPhone: single column, bottom navigation, reordered priorities */
+@media (max-width: 640px) {
+  .main-content {
+    padding:
+      1rem
+      1rem
+      calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  .metrics-row {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cash-flow-panel,
+  .budget-panel,
+  .upcoming-panel,
+  .debt-panel,
+  .goals-panel,
+  .alerts-panel,
+  .networth-panel {
+    grid-column: span 1;
+  }
+
+  .desktop-header-details {
+    display: none;
+  }
+
+  .two-col,
+  .three-col {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
