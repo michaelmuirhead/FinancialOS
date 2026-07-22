@@ -1,0 +1,25 @@
+:root {
+  --navy-950: #061b3a;
+  --navy-900: #082954;
+  --blue-600: #2563eb;
+  --blue-100: #dbeafe;
+  --green-600: #16a34a;
+  --green-100: #dcfce7;
+  --red-600: #dc2626;
+  --red-100: #fee2e2;
+  --amber-500: #f59e0b;
+  --amber-100: #fef3c7;
+  --purple-600: #7c3aed;
+  --purple-100: #ede9fe;
+  --surface: #ffffff;
+  --background: #f6f8fc;
+  --border: #dce3ee;
+  --text-primary: #102247;
+  --text-secondary: #64748b;
+
+  --radius-card: 14px;
+  --shadow-card: 0 2px 8px rgb(15 23 42 / 0.05);
+  --sidebar-width: 250px;
+  --header-height: 60px;
+  --bottom-nav-height: 4.25rem;
+}
