@@ -2,6 +2,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Money } from "@/components/ui/Money";
 import { Button } from "@/components/ui/Button";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { billLikeCategoryIds, detectSubscriptions } from "@/calculations";
 import { useCategories, useTransactions } from "@/hooks/useFinancialData";
 import { formatCurrency, monthLabel, currentMonth } from "@/lib/format";
 
@@ -96,6 +98,53 @@ export function ReportsPage() {
           <Money value={income - expenses} className="metric-card__value" />
         </Card>
       </div>
+      {(() => {
+        const subscriptions = detectSubscriptions(
+          transactions ?? [],
+          billLikeCategoryIds(categories ?? []),
+        );
+        if (subscriptions.length === 0) return null;
+        const total = subscriptions.reduce((sum, s) => sum + s.monthlyAmount, 0);
+        return (
+          <Card
+            title="Subscription report"
+            className="page-section"
+            action={
+              <span className="card__title-link">
+                {formatCurrency(total)}/month detected
+              </span>
+            }
+          >
+            <div className="data-list">
+              {subscriptions.map((subscription) => (
+                <div className="data-list__row" key={subscription.merchant}>
+                  <div className="data-list__main">
+                    <div className="data-list__title">
+                      {subscription.merchant}
+                    </div>
+                    <div className="data-list__subtitle">
+                      Seen in {subscription.months} months · last on{" "}
+                      {subscription.lastDate}
+                    </div>
+                  </div>
+                  <div className="data-list__end">
+                    <Money value={subscription.monthlyAmount} />
+                    {subscription.priceIncreased &&
+                      subscription.previousAmount != null && (
+                        <div style={{ marginTop: 2 }}>
+                          <StatusBadge tone="amber">
+                            Up from{" "}
+                            {formatCurrency(subscription.previousAmount)}
+                          </StatusBadge>
+                        </div>
+                      )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        );
+      })()}
       <div className="two-col">
         <Card title="Spending by category">
           <div className="data-list">

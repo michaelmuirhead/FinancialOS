@@ -18,6 +18,7 @@ strategies, sinking funds, and net-worth trends in one place.
 | Sinking Funds | Christmas, car repairs, school clothes — predictable non-monthly expenses |
 | Savings Goals | Emergency-fund coverage and progress toward larger targets |
 | Net Worth | Monthly balance sheet: assets minus liabilities, with a 12-month trend |
+| Monthly Review | Guided month-end checklist with a generated, linked action plan |
 | Tax Center | Year-to-date income and giving, with document folders |
 | Reports | Income/expense summaries, category and merchant breakdowns, CSV export |
 | Documents | Household filing cabinet — uploads into folders (IndexedDB in demo, Supabase Storage connected) |
@@ -100,5 +101,10 @@ supabase/
    file), and rule-applied categories; merchant→category rules that learn
    as you categorize; transaction reconciliation workflow; document
    uploads into folders with download/delete
-4. **Intelligence:** anomaly alerts, cash-flow forecasts, monthly review
+4. **Intelligence (done):** spending anomaly detection against trailing
+   three-month averages, subscription discovery with price-increase flags,
+   possible-duplicate-charge alerts, debt payoff recommendations with
+   extra-payment sensitivity, cash-flow chart with actual/forecast modes
+   and 30/60/90-day horizons, and the guided Monthly Review page with an
+   auto-generated action plan
 5. **Advanced:** bank-data integration, push notifications, tax projection

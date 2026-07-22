@@ -9,6 +9,7 @@ import { DebtPage } from "@/pages/DebtPage";
 import { SinkingFundsPage } from "@/pages/SinkingFundsPage";
 import { SavingsPage } from "@/pages/SavingsPage";
 import { NetWorthPage } from "@/pages/NetWorthPage";
+import { MonthlyReviewPage } from "@/pages/MonthlyReviewPage";
 import { TaxCenterPage } from "@/pages/TaxCenterPage";
 import { ReportsPage } from "@/pages/ReportsPage";
 import { DocumentsPage } from "@/pages/DocumentsPage";
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
       { path: "/sinking-funds", element: <SinkingFundsPage /> },
       { path: "/goals", element: <SavingsPage /> },
       { path: "/net-worth", element: <NetWorthPage /> },
+      { path: "/review", element: <MonthlyReviewPage /> },
       { path: "/tax", element: <TaxCenterPage /> },
       { path: "/reports", element: <ReportsPage /> },
       { path: "/documents", element: <DocumentsPage /> },
