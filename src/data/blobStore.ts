@@ -1,7 +1,7 @@
 /**
  * IndexedDB-backed blob storage for demo mode, so uploaded documents work
- * fully offline without a backend. When Supabase is connected, files go to
- * Supabase Storage instead and this store is unused.
+ * fully offline without a backend. When Firebase is connected, files go to
+ * Cloud Storage instead and this store is unused.
  */
 
 const DB_NAME = "homevault-files";

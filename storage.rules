@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// Uploaded documents are stored under documents/{householdId}/... and are
+// accessible only to that household's members (checked against Firestore).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /documents/{householdId}/{fileName=**} {
+      allow read, write: if request.auth != null
+        && firestore.exists(/databases/(default)/documents/households/$(householdId)/members/$(request.auth.uid));
+    }
+  }
+}

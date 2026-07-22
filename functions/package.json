@@ -1,0 +1,13 @@
+{
+  "name": "homevault-functions",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.5",
+    "firebase-functions": "^6.4.0"
+  }
+}

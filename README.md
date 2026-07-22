@@ -31,9 +31,11 @@ strategies, sinking funds, and net-worth trends in one place.
 - **Frontend:** React 18 + TypeScript, Vite, React Router, TanStack Query,
   React Hook Form + Zod, Recharts, Lucide icons
 - **PWA:** vite-plugin-pwa (installable, offline app shell)
-- **Backend:** Supabase (PostgreSQL + Auth + Storage) with Row Level
-  Security — schema in `supabase/migrations/`
-- **Hosting:** Vercel (SPA rewrites in `vercel.json`)
+- **Backend:** Firebase — Firestore (household-scoped data), Firebase Auth
+  (email/password + Google), Cloud Storage (documents), Cloud Functions
+  (AI screenshot extraction); security rules in `firestore.rules` and
+  `storage.rules`
+- **Hosting:** Firebase Hosting (`firebase.json`) or Vercel (`vercel.json`)
 
 ## Getting started
 
@@ -45,33 +47,39 @@ npm run dev
 With no configuration the app runs in **demo mode** against a sample
 household dataset (persisted in localStorage — reset it from Settings).
 
-### Connecting Supabase
+### Connecting Firebase
 
-1. Create a Supabase project and run `supabase/migrations/0001_initial_schema.sql`,
-   then `supabase/seed.sql`.
-2. After your first sign-in, add your user to `household_members` (see the
-   comment in `seed.sql`).
-3. Copy `.env.example` to `.env` and fill in:
+1. Create a Firebase project at console.firebase.google.com and enable
+   **Authentication** (Email/Password and Google), **Firestore**, and
+   **Storage**.
+2. Register a web app in the project settings and copy its config values
+   into `.env` (see `.env.example` — `VITE_FIREBASE_API_KEY`,
+   `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`,
+   `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_APP_ID`).
+3. Deploy the security rules:
+   `firebase deploy --only firestore:rules,storage`
+4. Start the app and create an account — your household, membership, and
+   default budget categories are created automatically on first sign-in.
 
-```
-VITE_SUPABASE_URL=https://<project>.supabase.co
-VITE_SUPABASE_ANON_KEY=<anon key>
-```
-
-Never commit service-role keys or put them in frontend env vars. Row Level
-Security restricts every table to members of the record's household.
+The Firebase web config values are public client keys; access control is
+enforced by the security rules, which restrict every document under
+`households/{id}/…` to that household's members. Data lives in Firestore
+subcollections (accounts, bills, billOccurrences, transactions, debts,
+goals, paychecks, netWorthSnapshots, categoryRules, documents), and
+uploaded files live in Cloud Storage under `documents/{householdId}/`.
 
 ### Screenshot import (AI extraction)
 
 The "Import from screenshot" quick action reads balances, upcoming bills,
 and transactions out of a screenshot (banking app, bill, statement) and
 applies them — after your review — to accounts, bills, and the ledger, which
-updates the Forecast automatically. Extraction runs through a Supabase Edge
-Function so the Anthropic API key never reaches the browser:
+updates the Forecast automatically. Extraction runs through a Firebase
+Cloud Function so the Anthropic API key never reaches the browser:
 
 ```bash
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-supabase functions deploy extract-screenshot
+cd functions && npm install && cd ..
+firebase functions:secrets:set ANTHROPIC_API_KEY
+firebase deploy --only functions
 ```
 
 The function uses Claude (vision + structured outputs) and costs roughly
@@ -97,12 +105,12 @@ src/
 ├── data/           Demo dataset + local demo store
 ├── hooks/          TanStack Query hooks
 ├── pages/          One page per module
-├── services/       Supabase client, data access, dashboard aggregation
+├── services/       Firebase client, auth, data access, dashboard aggregation
 ├── styles/         Design tokens, global styles, responsive rules
 └── types/          Shared domain types
-supabase/
-├── migrations/     Postgres schema with RLS policies
-└── seed.sql        Starter household + categories
+functions/          Firebase Cloud Functions (screenshot extraction)
+firestore.rules     Household-membership security rules
+storage.rules       Document storage rules
 ```
 
 ## Construction phases

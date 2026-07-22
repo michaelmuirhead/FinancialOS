@@ -26,7 +26,7 @@ export interface Subscription {
 /**
  * Categories that recur but are not subscriptions — regular bills, staples,
  * and everyday spending. Matched by name so it works for both the demo
- * dataset and Supabase-seeded categories.
+ * dataset and backend-seeded categories.
  */
 const NON_SUBSCRIPTION_CATEGORIES = new Set([
   "housing",

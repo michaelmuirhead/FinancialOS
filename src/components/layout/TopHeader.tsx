@@ -1,7 +1,7 @@
 import { Bell, CircleHelp, ShieldCheck, UserRound } from "lucide-react";
 import { useHousehold } from "@/hooks/useFinancialData";
 import { monthLabel, currentMonth } from "@/lib/format";
-import { isDemoMode } from "@/services/supabase";
+import { isDemoMode } from "@/services/firebase";
 
 export function TopHeader() {
   const { data: household } = useHousehold();
