@@ -61,6 +61,24 @@ VITE_SUPABASE_ANON_KEY=<anon key>
 Never commit service-role keys or put them in frontend env vars. Row Level
 Security restricts every table to members of the record's household.
 
+### Screenshot import (AI extraction)
+
+The "Import from screenshot" quick action reads balances, upcoming bills,
+and transactions out of a screenshot (banking app, bill, statement) and
+applies them — after your review — to accounts, bills, and the ledger, which
+updates the Forecast automatically. Extraction runs through a Supabase Edge
+Function so the Anthropic API key never reaches the browser:
+
+```bash
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+supabase functions deploy extract-screenshot
+```
+
+The function uses Claude (vision + structured outputs) and costs roughly
+1–4 cents per screenshot. Full account numbers are never extracted — only
+names, last-four digits, and amounts. In demo mode the modal explains the
+setup and offers a sample-data preview of the flow.
+
 ## Scripts
 
 | Command | Purpose |

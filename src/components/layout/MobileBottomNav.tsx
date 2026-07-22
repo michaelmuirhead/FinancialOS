@@ -14,6 +14,7 @@ import { QuickAction, useQuickActions } from "./QuickActionsContext";
 const ADD_ACTIONS: { label: string; action: QuickAction }[] = [
   { label: "Add transaction", action: "add-transaction" },
   { label: "Record paycheck", action: "record-paycheck" },
+  { label: "Import from screenshot", action: "import-screenshot" },
   { label: "Add bill", action: "add-bill" },
   { label: "Add account", action: "add-account" },
   { label: "Add debt", action: "add-debt" },

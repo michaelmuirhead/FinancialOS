@@ -35,6 +35,7 @@ import {
   NewPaycheckInput,
   NewTransactionInput,
   recordNetWorthSnapshot,
+  updateAccountBalance,
   updateCategoryTarget,
   updateTransactionCategory,
   updateTransactionStatus,
@@ -210,6 +211,20 @@ export function useUpdateTransactionStatus() {
       transactionId: string;
       status: TransactionStatus;
     }) => updateTransactionStatus(transactionId, status),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+export function useUpdateAccountBalance() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      accountId,
+      balance,
+    }: {
+      accountId: string;
+      balance: number;
+    }) => updateAccountBalance(accountId, balance),
     onSuccess: () => queryClient.invalidateQueries(),
   });
 }

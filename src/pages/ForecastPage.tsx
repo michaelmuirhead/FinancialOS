@@ -9,7 +9,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { Camera } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useQuickActions } from "@/components/layout/QuickActionsContext";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Money } from "@/components/ui/Money";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -54,6 +57,7 @@ function addDaysIso(days: number): string {
 }
 
 export function ForecastPage() {
+  const { open } = useQuickActions();
   const { data: accounts } = useAccounts();
   const { data: bills } = useBills();
   const { data: occurrences } = useBillOccurrences();
@@ -147,6 +151,11 @@ export function ForecastPage() {
       <PageHeader
         title="Forecast"
         description="Where the balance is headed — every scheduled bill, paycheck, minimum payment, and transfer, day by day."
+        actions={
+          <Button variant="secondary" onClick={() => open("import-screenshot")}>
+            <Camera size={15} /> Import from screenshot
+          </Button>
+        }
       />
 
       <div className="metrics-row metrics-row--six">
