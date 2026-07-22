@@ -3,6 +3,7 @@ import {
   Bill,
   BillOccurrence,
   Category,
+  CategoryRule,
   Debt,
   Goal,
   Household,
@@ -634,6 +635,39 @@ export const demoGoals: Goal[] = [
     currentAmount: 350,
     targetDate: isoDaysFromNow(45).slice(0, 7) + "-01",
     monthlyContribution: 125,
+  },
+];
+
+export const demoCategoryRules: CategoryRule[] = [
+  {
+    id: "rule-kroger",
+    householdId: "hh-demo",
+    merchantPattern: "kroger",
+    categoryId: "cat-groceries",
+  },
+  {
+    id: "rule-walmart",
+    householdId: "hh-demo",
+    merchantPattern: "walmart",
+    categoryId: "cat-shopping",
+  },
+  {
+    id: "rule-shell",
+    householdId: "hh-demo",
+    merchantPattern: "shell",
+    categoryId: "cat-gas",
+  },
+  {
+    id: "rule-verizon",
+    householdId: "hh-demo",
+    merchantPattern: "verizon",
+    categoryId: "cat-utilities",
+  },
+  {
+    id: "rule-jnt",
+    householdId: "hh-demo",
+    merchantPattern: "jnt",
+    categoryId: "cat-giving",
   },
 ];
 

@@ -2,6 +2,8 @@ export * from "./account";
 export * from "./alert";
 export * from "./bill";
 export * from "./debt";
+export * from "./document";
+export * from "./rule";
 export * from "./goal";
 export * from "./household";
 export * from "./paycheck";

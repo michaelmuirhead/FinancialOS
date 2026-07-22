@@ -3,14 +3,19 @@ import {
   Bill,
   BillOccurrence,
   Category,
+  CategoryRule,
   Debt,
+  DocumentFolder,
+  DocumentRecord,
   Goal,
   Household,
   HouseholdRules,
   Paycheck,
   Transaction,
+  TransactionStatus,
 } from "@/types";
 import { demoStore, newId } from "@/data/demoStore";
+import { deleteBlob, getBlob, putBlob } from "@/data/blobStore";
 import { isDemoMode, supabase } from "./supabase";
 
 /**
@@ -480,6 +485,225 @@ export async function createGoal(input: NewGoalInput): Promise<void> {
     target_date: input.targetDate ?? null,
     monthly_contribution: input.monthlyContribution ?? null,
   });
+  if (error) throw error;
+}
+
+/* ---------- Category rules ---------- */
+
+export async function fetchCategoryRules(): Promise<CategoryRule[]> {
+  if (isDemoMode || !supabase) return demoStore.get().categoryRules;
+  const { data, error } = await supabase
+    .from("category_rules")
+    .select("*")
+    .order("merchant_pattern");
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    householdId: row.household_id,
+    merchantPattern: row.merchant_pattern,
+    categoryId: row.category_id,
+  }));
+}
+
+/** Returns the category for a merchant, per the household's learned rules. */
+export function applyCategoryRules(
+  merchant: string,
+  rules: CategoryRule[],
+): string | undefined {
+  const lowered = merchant.toLowerCase();
+  return rules.find((rule) =>
+    lowered.includes(rule.merchantPattern.toLowerCase()),
+  )?.categoryId;
+}
+
+export async function upsertCategoryRule(
+  merchantPattern: string,
+  categoryId: string,
+): Promise<void> {
+  if (isDemoMode || !supabase) {
+    demoStore.upsertCategoryRule({
+      id: newId("rule"),
+      householdId: demoStore.get().household.id,
+      merchantPattern,
+      categoryId,
+    });
+    return;
+  }
+  const household = await fetchHousehold();
+  const { error } = await supabase.from("category_rules").upsert(
+    {
+      household_id: household.id,
+      merchant_pattern: merchantPattern.toLowerCase(),
+      category_id: categoryId,
+    },
+    { onConflict: "household_id,merchant_pattern" },
+  );
+  if (error) throw error;
+}
+
+export async function deleteCategoryRule(ruleId: string): Promise<void> {
+  if (isDemoMode || !supabase) {
+    demoStore.deleteCategoryRule(ruleId);
+    return;
+  }
+  const { error } = await supabase
+    .from("category_rules")
+    .delete()
+    .eq("id", ruleId);
+  if (error) throw error;
+}
+
+/* ---------- Bulk import & ledger updates ---------- */
+
+export async function importTransactions(
+  inputs: NewTransactionInput[],
+): Promise<number> {
+  if (inputs.length === 0) return 0;
+  if (isDemoMode || !supabase) {
+    const householdId = demoStore.get().household.id;
+    demoStore.addTransactions(
+      inputs.map((input) => ({
+        id: newId("tx"),
+        householdId,
+        status: "posted" as const,
+        ...input,
+      })),
+    );
+    return inputs.length;
+  }
+  const household = await fetchHousehold();
+  const { error } = await supabase.from("transactions").insert(
+    inputs.map((input) => ({
+      household_id: household.id,
+      account_id: input.accountId,
+      transaction_date: input.transactionDate,
+      merchant: input.merchant,
+      amount: input.amount,
+      transaction_type: input.transactionType,
+      category_id: input.categoryId ?? null,
+      notes: input.notes ?? null,
+    })),
+  );
+  if (error) throw error;
+  return inputs.length;
+}
+
+export async function updateTransactionCategory(
+  transactionId: string,
+  categoryId: string | undefined,
+): Promise<void> {
+  if (isDemoMode || !supabase) {
+    demoStore.updateTransaction(transactionId, { categoryId });
+    return;
+  }
+  const { error } = await supabase
+    .from("transactions")
+    .update({ category_id: categoryId ?? null })
+    .eq("id", transactionId);
+  if (error) throw error;
+}
+
+export async function updateTransactionStatus(
+  transactionId: string,
+  status: TransactionStatus,
+): Promise<void> {
+  if (isDemoMode || !supabase) {
+    demoStore.updateTransaction(transactionId, { status });
+    return;
+  }
+  const { error } = await supabase
+    .from("transactions")
+    .update({ status })
+    .eq("id", transactionId);
+  if (error) throw error;
+}
+
+/* ---------- Documents ---------- */
+
+export async function fetchDocuments(): Promise<DocumentRecord[]> {
+  if (isDemoMode || !supabase) return demoStore.get().documents;
+  const { data, error } = await supabase
+    .from("documents")
+    .select("*")
+    .order("uploaded_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    householdId: row.household_id,
+    folder: row.folder,
+    name: row.name,
+    mimeType: row.mime_type,
+    sizeBytes: Number(row.size_bytes ?? 0),
+    storagePath: row.storage_path ?? undefined,
+    uploadedAt: row.uploaded_at,
+  }));
+}
+
+export async function uploadDocument(
+  folder: DocumentFolder,
+  file: File,
+): Promise<void> {
+  if (isDemoMode || !supabase) {
+    const id = newId("doc");
+    await putBlob(id, file);
+    demoStore.addDocument({
+      id,
+      householdId: demoStore.get().household.id,
+      folder,
+      name: file.name,
+      mimeType: file.type || "application/octet-stream",
+      sizeBytes: file.size,
+      uploadedAt: new Date().toISOString(),
+    });
+    return;
+  }
+  const household = await fetchHousehold();
+  const storagePath = `${household.id}/${crypto.randomUUID()}-${file.name}`;
+  const { error: storageError } = await supabase.storage
+    .from("documents")
+    .upload(storagePath, file);
+  if (storageError) throw storageError;
+  const { error } = await supabase.from("documents").insert({
+    household_id: household.id,
+    folder,
+    name: file.name,
+    mime_type: file.type || "application/octet-stream",
+    size_bytes: file.size,
+    storage_path: storagePath,
+  });
+  if (error) throw error;
+}
+
+export async function getDocumentBlob(
+  document: DocumentRecord,
+): Promise<Blob | undefined> {
+  if (isDemoMode || !supabase) return getBlob(document.id);
+  if (!document.storagePath) return undefined;
+  const { data, error } = await supabase.storage
+    .from("documents")
+    .download(document.storagePath);
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteDocument(
+  document: DocumentRecord,
+): Promise<void> {
+  if (isDemoMode || !supabase) {
+    await deleteBlob(document.id);
+    demoStore.deleteDocument(document.id);
+    return;
+  }
+  if (document.storagePath) {
+    const { error: storageError } = await supabase.storage
+      .from("documents")
+      .remove([document.storagePath]);
+    if (storageError) throw storageError;
+  }
+  const { error } = await supabase
+    .from("documents")
+    .delete()
+    .eq("id", document.id);
   if (error) throw error;
 }
 

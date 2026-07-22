@@ -3,18 +3,22 @@ import {
   Bill,
   BillOccurrence,
   Category,
+  CategoryRule,
   Debt,
+  DocumentRecord,
   Goal,
   Household,
   HouseholdRules,
   Paycheck,
   Transaction,
+  TransactionStatus,
 } from "@/types";
 import {
   demoAccounts,
   demoBillOccurrences,
   demoBills,
   demoCategories,
+  demoCategoryRules,
   demoDebts,
   demoGoals,
   demoHousehold,
@@ -36,9 +40,11 @@ interface DemoState {
   goals: Goal[];
   paychecks: Paycheck[];
   netWorthHistory: { month: string; netWorth: number }[];
+  categoryRules: CategoryRule[];
+  documents: DocumentRecord[];
 }
 
-const STORAGE_KEY = "homevault-demo-state-v2";
+const STORAGE_KEY = "homevault-demo-state-v3";
 
 function seedState(): DemoState {
   return {
@@ -53,6 +59,8 @@ function seedState(): DemoState {
     goals: demoGoals,
     paychecks: demoPaychecks,
     netWorthHistory: demoNetWorthHistory,
+    categoryRules: demoCategoryRules,
+    documents: [],
   };
 }
 
@@ -152,6 +160,65 @@ export const demoStore = {
   updateCategoryTarget(categoryId: string, monthlyTarget: number): void {
     state.categories = state.categories.map((category) =>
       category.id === categoryId ? { ...category, monthlyTarget } : category,
+    );
+    persist();
+  },
+
+  addTransactions(transactions: Transaction[]): void {
+    state.transactions = [...transactions, ...state.transactions];
+    persist();
+  },
+
+  updateTransaction(
+    transactionId: string,
+    patch: Partial<Pick<Transaction, "categoryId" | "status">>,
+  ): void {
+    state.transactions = state.transactions.map((transaction) =>
+      transaction.id === transactionId
+        ? { ...transaction, ...patch }
+        : transaction,
+    );
+    persist();
+  },
+
+  setTransactionsStatus(ids: string[], status: TransactionStatus): void {
+    const idSet = new Set(ids);
+    state.transactions = state.transactions.map((transaction) =>
+      idSet.has(transaction.id) ? { ...transaction, status } : transaction,
+    );
+    persist();
+  },
+
+  upsertCategoryRule(rule: CategoryRule): void {
+    const pattern = rule.merchantPattern.toLowerCase();
+    const existing = state.categoryRules.find(
+      (candidate) => candidate.merchantPattern.toLowerCase() === pattern,
+    );
+    state.categoryRules = existing
+      ? state.categoryRules.map((candidate) =>
+          candidate.id === existing.id
+            ? { ...candidate, categoryId: rule.categoryId }
+            : candidate,
+        )
+      : [...state.categoryRules, rule];
+    persist();
+  },
+
+  deleteCategoryRule(ruleId: string): void {
+    state.categoryRules = state.categoryRules.filter(
+      (rule) => rule.id !== ruleId,
+    );
+    persist();
+  },
+
+  addDocument(document: DocumentRecord): void {
+    state.documents = [document, ...state.documents];
+    persist();
+  },
+
+  deleteDocument(documentId: string): void {
+    state.documents = state.documents.filter(
+      (document) => document.id !== documentId,
     );
     persist();
   },
