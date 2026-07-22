@@ -424,6 +424,21 @@ export async function createAccount(input: NewAccountInput): Promise<void> {
   if (error) throw error;
 }
 
+export async function updateAccountBalance(
+  accountId: string,
+  balance: number,
+): Promise<void> {
+  if (isDemoMode || !supabase) {
+    demoStore.updateAccountBalance(accountId, balance);
+    return;
+  }
+  const { error } = await supabase
+    .from("accounts")
+    .update({ current_balance: balance, available_balance: balance })
+    .eq("id", accountId);
+  if (error) throw error;
+}
+
 export interface NewDebtInput {
   name: string;
   debtType: Debt["debtType"];

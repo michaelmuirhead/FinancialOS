@@ -113,6 +113,15 @@ export const demoStore = {
     persist();
   },
 
+  updateAccountBalance(accountId: string, balance: number): void {
+    state.accounts = state.accounts.map((account) =>
+      account.id === accountId
+        ? { ...account, currentBalance: balance, availableBalance: balance }
+        : account,
+    );
+    persist();
+  },
+
   addDebt(debt: Debt): void {
     state.debts = [...state.debts, debt];
     persist();

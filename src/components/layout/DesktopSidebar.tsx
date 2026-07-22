@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   ArrowLeftRight,
   CalendarPlus,
+  Camera,
   Goal,
   Landmark,
   ReceiptText,
@@ -53,6 +54,13 @@ export function DesktopSidebar() {
           >
             <WalletCards size={16} />
             Record paycheck
+          </button>
+          <button
+            className="quick-actions__button"
+            onClick={() => open("import-screenshot")}
+          >
+            <Camera size={16} />
+            Import from screenshot
           </button>
           <button
             className="quick-actions__button"
