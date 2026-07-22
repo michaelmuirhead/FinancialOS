@@ -10,13 +10,15 @@ import {
   buildCashFlowSeries,
   calculateSafeToSpend,
   CashFlowPoint,
+  generateAlerts,
   netWorthFromAccounts,
+  withCurrentMonth,
 } from "@/calculations";
 import { LIQUID_ACCOUNT_TYPES } from "@/types";
 import {
   fetchAccounts,
-  fetchAlerts,
   fetchBillOccurrences,
+  fetchCategories,
   fetchDebts,
   fetchGoals,
   fetchNetWorthHistory,
@@ -58,7 +60,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     debts,
     goals,
     paychecks,
-    alerts,
+    categories,
     rules,
     netWorthHistory,
   ] = await Promise.all([
@@ -68,10 +70,20 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     fetchDebts(),
     fetchGoals(),
     fetchPaychecks(),
-    fetchAlerts(),
+    fetchCategories(),
     fetchRules(),
     fetchNetWorthHistory(),
   ]);
+
+  const alerts = generateAlerts({
+    accounts,
+    debts,
+    occurrences,
+    categories,
+    transactions,
+    goals,
+    rules,
+  });
 
   const totalCash = accounts
     .filter(
@@ -140,7 +152,8 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   });
 
   const { netWorth } = netWorthFromAccounts(accounts);
-  const previousMonth = netWorthHistory[netWorthHistory.length - 2];
+  const history = withCurrentMonth(netWorthHistory, netWorth);
+  const previousMonth = history[history.length - 2];
   const netWorthChangeMonth = previousMonth
     ? netWorth - previousMonth.netWorth
     : 0;
@@ -177,7 +190,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     paychecks,
     debts,
     goals,
-    netWorthHistory,
+    netWorthHistory: history,
     monthlySpending,
   };
 }

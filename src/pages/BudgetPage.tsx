@@ -1,15 +1,36 @@
+import { useState } from "react";
+import { Pencil } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Money } from "@/components/ui/Money";
 import { budgetTone, ProgressBar } from "@/components/ui/ProgressBar";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { summarizeCategory, budgetWarningLevel } from "@/calculations";
-import { useCategories, useTransactions } from "@/hooks/useFinancialData";
+import {
+  useCategories,
+  useTransactions,
+  useUpdateCategoryTarget,
+} from "@/hooks/useFinancialData";
 import { formatPercent } from "@/lib/format";
 
 export function BudgetPage() {
   const { data: categories } = useCategories();
   const { data: transactions } = useTransactions();
+  const updateTarget = useUpdateCategoryTarget();
+  const [editing, setEditing] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+  function saveTargets() {
+    for (const [categoryId, raw] of Object.entries(drafts)) {
+      const value = Number(raw);
+      if (Number.isFinite(value) && value >= 0) {
+        updateTarget.mutate({ categoryId, monthlyTarget: value });
+      }
+    }
+    setDrafts({});
+    setEditing(false);
+  }
 
   const now = new Date();
   const month = now.toISOString().slice(0, 7);
@@ -50,6 +71,22 @@ export function BudgetPage() {
       <PageHeader
         title="Budget"
         description="Planned versus actual spending, with month-end projections."
+        actions={
+          editing ? (
+            <>
+              <Button variant="secondary" onClick={() => setEditing(false)}>
+                Cancel
+              </Button>
+              <Button onClick={saveTargets} disabled={updateTarget.isPending}>
+                Save targets
+              </Button>
+            </>
+          ) : (
+            <Button variant="secondary" onClick={() => setEditing(true)}>
+              <Pencil size={14} /> Edit targets
+            </Button>
+          )
+        }
       />
       <Card
         title="Month at a glance"
@@ -96,11 +133,35 @@ export function BudgetPage() {
                       <StatusBadge tone="amber">75%+</StatusBadge>
                     )}
                   </span>
-                  <span style={{ color: "var(--text-secondary)" }}>
-                    <Money value={summary.spent} /> /{" "}
-                    <Money value={summary.monthlyTarget} /> · projected{" "}
-                    <Money value={summary.projectedMonthEnd} />
-                  </span>
+                  {editing ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <Money value={summary.spent} /> /
+                      <input
+                        className="form-field__input"
+                        type="number"
+                        min={0}
+                        step={10}
+                        style={{ width: 90, padding: "0.25rem 0.5rem" }}
+                        value={
+                          drafts[summary.categoryId] ??
+                          String(summary.monthlyTarget)
+                        }
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [summary.categoryId]: event.target.value,
+                          }))
+                        }
+                        aria-label={`${summary.name} monthly target`}
+                      />
+                    </span>
+                  ) : (
+                    <span style={{ color: "var(--text-secondary)" }}>
+                      <Money value={summary.spent} /> /{" "}
+                      <Money value={summary.monthlyTarget} /> · projected{" "}
+                      <Money value={summary.projectedMonthEnd} />
+                    </span>
+                  )}
                 </div>
                 <ProgressBar
                   percent={summary.percentUsed}

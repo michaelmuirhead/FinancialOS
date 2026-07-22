@@ -15,6 +15,21 @@ export interface NetWorthBreakdown {
   netWorth: number;
 }
 
+/**
+ * Ensures the history series ends with the live computed net worth for the
+ * current month, replacing any stale stored snapshot for this month.
+ */
+export function withCurrentMonth(
+  history: { month: string; netWorth: number }[],
+  currentNetWorth: number,
+): { month: string; netWorth: number }[] {
+  const month = new Date().toISOString().slice(0, 7);
+  return [
+    ...history.filter((point) => point.month !== month),
+    { month, netWorth: currentNetWorth },
+  ].sort((a, b) => a.month.localeCompare(b.month));
+}
+
 export function netWorthFromAccounts(accounts: Account[]): NetWorthBreakdown {
   const included = accounts.filter(
     (account) => account.isActive && account.includeInNetWorth,

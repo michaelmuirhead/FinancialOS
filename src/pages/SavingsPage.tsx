@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Money } from "@/components/ui/Money";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ContributeControl } from "@/components/forms/ContributeControl";
 import {
   emergencyFundCoverageMonths,
   goalProgressPercent,
@@ -108,6 +109,7 @@ export function SavingsPage() {
                     </div>
                   )}
                 </div>
+                <ContributeControl goalId={goal.id} />
               </Card>
             );
           })}

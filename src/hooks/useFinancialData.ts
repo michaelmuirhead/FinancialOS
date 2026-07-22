@@ -4,13 +4,14 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import {
+  contributeToGoal,
   createAccount,
   createBill,
   createDebt,
   createGoal,
+  createPaycheck,
   createTransaction,
   fetchAccounts,
-  fetchAlerts,
   fetchBillOccurrences,
   fetchBills,
   fetchCategories,
@@ -26,7 +27,10 @@ import {
   NewBillInput,
   NewDebtInput,
   NewGoalInput,
+  NewPaycheckInput,
   NewTransactionInput,
+  recordNetWorthSnapshot,
+  updateCategoryTarget,
 } from "@/services/dataService";
 import { getDashboardSummary } from "@/services/dashboardService";
 
@@ -73,10 +77,6 @@ export function usePaychecks() {
   return useQuery({ queryKey: ["paychecks"], queryFn: fetchPaychecks });
 }
 
-export function useAlerts() {
-  return useQuery({ queryKey: ["alerts"], queryFn: fetchAlerts });
-}
-
 export function useNetWorthHistory() {
   return useQuery({
     queryKey: ["net-worth-history"],
@@ -119,6 +119,42 @@ export function useCreateDebt() {
 
 export function useCreateGoal() {
   return useInvalidatingMutation<NewGoalInput>(createGoal);
+}
+
+export function useCreatePaycheck() {
+  return useInvalidatingMutation<NewPaycheckInput>(createPaycheck);
+}
+
+export function useContributeToGoal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ goalId, amount }: { goalId: string; amount: number }) =>
+      contributeToGoal(goalId, amount),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+export function useUpdateCategoryTarget() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      categoryId,
+      monthlyTarget,
+    }: {
+      categoryId: string;
+      monthlyTarget: number;
+    }) => updateCategoryTarget(categoryId, monthlyTarget),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+export function useRecordNetWorthSnapshot() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ month, netWorth }: { month: string; netWorth: number }) =>
+      recordNetWorthSnapshot(month, netWorth),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
 }
 
 export function useMarkBillPaid() {
