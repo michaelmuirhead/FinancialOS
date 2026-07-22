@@ -1,4 +1,25 @@
 import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  increment,
+  orderBy,
+  query,
+  setDoc,
+  updateDoc,
+  writeBatch,
+  CollectionReference,
+  DocumentData,
+} from "firebase/firestore";
+import {
+  deleteObject,
+  getBlob as storageGetBlob,
+  ref as storageRef,
+  uploadBytes,
+} from "firebase/storage";
+import {
   Account,
   Bill,
   BillOccurrence,
@@ -16,130 +37,86 @@ import {
 } from "@/types";
 import { demoStore, newId } from "@/data/demoStore";
 import { deleteBlob, getBlob, putBlob } from "@/data/blobStore";
-import { isDemoMode, supabase } from "./supabase";
+import { db, isDemoMode, storage } from "./firebase";
+import { currentHouseholdId } from "./authService";
 
 /**
  * All reads go through this module. In demo mode data comes from the local
- * demo store; when Supabase is configured, core entities are fetched from
- * Postgres (mapped from snake_case rows) and scoped by RLS to the signed-in
- * user's household.
+ * demo store; with Firebase configured, entities live in Firestore under
+ * households/{householdId}/<collection>, guarded by membership security
+ * rules. Documents are stored in camelCase matching the app types, so rows
+ * map with only an id/householdId envelope.
  */
 
-function mapAccount(row: Record<string, unknown>): Account {
+const DEFAULT_RULES: HouseholdRules = {
+  minimumCheckingBuffer: 500,
+  givingPercentOfGross: 10,
+  utilizationWarningPercent: 30,
+  bonusSplitDebtPercent: 50,
+};
+
+async function householdCollection(
+  name: string,
+): Promise<{ ref: CollectionReference<DocumentData>; householdId: string }> {
+  if (!db) throw new Error("Firebase is not configured");
+  const householdId = await currentHouseholdId();
   return {
-    id: row.id as string,
-    householdId: row.household_id as string,
-    name: row.name as string,
-    institution: (row.institution as string) ?? undefined,
-    accountType: row.account_type as Account["accountType"],
-    lastFour: (row.last_four as string) ?? undefined,
-    currentBalance: Number(row.current_balance ?? 0),
-    availableBalance:
-      row.available_balance == null ? undefined : Number(row.available_balance),
-    creditLimit: row.credit_limit == null ? undefined : Number(row.credit_limit),
-    interestRate:
-      row.interest_rate == null ? undefined : Number(row.interest_rate),
-    includeInSafeToSpend: Boolean(row.include_in_safe_to_spend),
-    includeInNetWorth: Boolean(row.include_in_net_worth),
-    isActive: Boolean(row.is_active),
+    ref: collection(db, "households", householdId, name),
+    householdId,
   };
 }
 
-function mapTransaction(row: Record<string, unknown>): Transaction {
-  return {
-    id: row.id as string,
-    householdId: row.household_id as string,
-    accountId: row.account_id as string,
-    transactionDate: row.transaction_date as string,
-    merchant: row.merchant as string,
-    description: (row.description as string) ?? undefined,
-    amount: Number(row.amount ?? 0),
-    transactionType: row.transaction_type as Transaction["transactionType"],
-    categoryId: (row.category_id as string) ?? undefined,
-    status: row.status as Transaction["status"],
-    notes: (row.notes as string) ?? undefined,
-  };
-}
-
-function mapDebt(row: Record<string, unknown>): Debt {
-  return {
-    id: row.id as string,
-    householdId: row.household_id as string,
-    accountId: (row.account_id as string) ?? undefined,
-    name: row.name as string,
-    debtType: row.debt_type as Debt["debtType"],
-    originalBalance:
-      row.original_balance == null ? undefined : Number(row.original_balance),
-    currentBalance: Number(row.current_balance ?? 0),
-    minimumPayment: Number(row.minimum_payment ?? 0),
-    annualInterestRate: Number(row.annual_interest_rate ?? 0),
-    creditLimit: row.credit_limit == null ? undefined : Number(row.credit_limit),
-    dueDay: row.due_day == null ? undefined : Number(row.due_day),
-    payoffPriority:
-      row.payoff_priority == null ? undefined : Number(row.payoff_priority),
-  };
-}
-
-function mapGoal(row: Record<string, unknown>): Goal {
-  return {
-    id: row.id as string,
-    householdId: row.household_id as string,
-    name: row.name as string,
-    goalType: row.goal_type as Goal["goalType"],
-    targetAmount: Number(row.target_amount ?? 0),
-    currentAmount: Number(row.current_amount ?? 0),
-    targetDate: (row.target_date as string) ?? undefined,
-    monthlyContribution:
-      row.monthly_contribution == null
-        ? undefined
-        : Number(row.monthly_contribution),
-  };
+function fromDoc<T>(
+  id: string,
+  householdId: string,
+  data: DocumentData,
+): T {
+  return { id, householdId, ...data } as T;
 }
 
 export async function fetchHousehold(): Promise<Household> {
-  if (isDemoMode || !supabase) return demoStore.get().household;
-  const { data, error } = await supabase
-    .from("households")
-    .select("*")
-    .limit(1)
-    .single();
-  if (error) throw error;
+  if (isDemoMode || !db) return demoStore.get().household;
+  const householdId = await currentHouseholdId();
+  const snap = await getDoc(doc(db, "households", householdId));
+  const data = snap.data() ?? {};
   return {
-    id: data.id,
-    name: data.name,
-    currency: data.currency,
-    timezone: data.timezone,
+    id: householdId,
+    name: (data.name as string) ?? "Our Household",
+    currency: (data.currency as string) ?? "USD",
+    timezone: (data.timezone as string) ?? "America/Chicago",
   };
 }
 
 export async function fetchRules(): Promise<HouseholdRules> {
-  return demoStore.get().rules;
+  if (isDemoMode || !db) return demoStore.get().rules;
+  const householdId = await currentHouseholdId();
+  const snap = await getDoc(doc(db, "households", householdId));
+  return { ...DEFAULT_RULES, ...((snap.data()?.rules ?? {}) as object) };
+}
+
+export async function updateHouseholdRules(
+  rules: HouseholdRules,
+): Promise<void> {
+  if (isDemoMode || !db) {
+    demoStore.updateRules(rules);
+    return;
+  }
+  const householdId = await currentHouseholdId();
+  await updateDoc(doc(db, "households", householdId), { rules });
 }
 
 export async function fetchAccounts(): Promise<Account[]> {
-  if (isDemoMode || !supabase) return demoStore.get().accounts;
-  const { data, error } = await supabase
-    .from("accounts")
-    .select("*")
-    .order("name");
-  if (error) throw error;
-  return (data ?? []).map(mapAccount);
+  if (isDemoMode || !db) return demoStore.get().accounts;
+  const { ref, householdId } = await householdCollection("accounts");
+  const snap = await getDocs(query(ref, orderBy("name")));
+  return snap.docs.map((d) => fromDoc<Account>(d.id, householdId, d.data()));
 }
 
 export async function fetchCategories(): Promise<Category[]> {
-  if (isDemoMode || !supabase) return demoStore.get().categories;
-  const { data, error } = await supabase
-    .from("categories")
-    .select("*")
-    .order("name");
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    name: row.name,
-    kind: row.kind,
-    monthlyTarget:
-      row.monthly_target == null ? undefined : Number(row.monthly_target),
-  }));
+  if (isDemoMode || !db) return demoStore.get().categories;
+  const { ref } = await householdCollection("categories");
+  const snap = await getDocs(query(ref, orderBy("name")));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Category);
 }
 
 /**
@@ -166,121 +143,141 @@ function deriveOccurrenceStatus(occurrence: BillOccurrence): BillOccurrence {
 }
 
 export async function fetchBills(): Promise<Bill[]> {
-  if (isDemoMode || !supabase) return demoStore.get().bills;
-  const { data, error } = await supabase.from("bills").select("*").order("due_day");
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    householdId: row.household_id,
-    name: row.name,
-    categoryId: row.category_id ?? undefined,
-    expectedAmount: Number(row.expected_amount ?? 0),
-    dueDay: Number(row.due_day ?? 1),
-    frequency: row.frequency,
-    autopay: Boolean(row.autopay),
-    paymentAccountId: row.payment_account_id ?? undefined,
-    isActive: Boolean(row.is_active),
-  }));
+  if (isDemoMode || !db) return demoStore.get().bills;
+  const { ref, householdId } = await householdCollection("bills");
+  const snap = await getDocs(query(ref, orderBy("dueDay")));
+  return snap.docs.map((d) => fromDoc<Bill>(d.id, householdId, d.data()));
 }
 
 export async function fetchBillOccurrences(): Promise<BillOccurrence[]> {
-  if (isDemoMode || !supabase) {
+  if (isDemoMode || !db) {
     return [...demoStore.get().billOccurrences]
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
       .map(deriveOccurrenceStatus);
   }
-  const { data, error } = await supabase
-    .from("bill_occurrences")
-    .select("*, bills(name, autopay)")
-    .order("due_date");
-  if (error) throw error;
-  return (data ?? []).map((row) => deriveOccurrenceStatus({
-    id: row.id,
-    billId: row.bill_id,
-    name: row.bills?.name ?? "Bill",
-    dueDate: row.due_date,
-    expectedAmount: Number(row.expected_amount ?? 0),
-    actualAmount:
-      row.actual_amount == null ? undefined : Number(row.actual_amount),
-    status: row.status,
-    autopay: Boolean(row.bills?.autopay),
-    paidDate: row.paid_date ?? undefined,
-  }));
+  const { ref } = await householdCollection("billOccurrences");
+  const snap = await getDocs(query(ref, orderBy("dueDate")));
+  return snap.docs.map((d) =>
+    deriveOccurrenceStatus({ id: d.id, ...d.data() } as BillOccurrence),
+  );
 }
 
-
 export async function fetchTransactions(): Promise<Transaction[]> {
-  if (isDemoMode || !supabase) {
+  if (isDemoMode || !db) {
     return [...demoStore.get().transactions].sort((a, b) =>
       b.transactionDate.localeCompare(a.transactionDate),
     );
   }
-  const { data, error } = await supabase
-    .from("transactions")
-    .select("*")
-    .order("transaction_date", { ascending: false })
-    .limit(500);
-  if (error) throw error;
-  return (data ?? []).map(mapTransaction);
+  const { ref, householdId } = await householdCollection("transactions");
+  const snap = await getDocs(query(ref, orderBy("transactionDate", "desc")));
+  return snap.docs.map((d) =>
+    fromDoc<Transaction>(d.id, householdId, d.data()),
+  );
 }
 
 export async function fetchDebts(): Promise<Debt[]> {
-  if (isDemoMode || !supabase) return demoStore.get().debts;
-  const { data, error } = await supabase
-    .from("debts")
-    .select("*")
-    .order("payoff_priority");
-  if (error) throw error;
-  return (data ?? []).map(mapDebt);
+  if (isDemoMode || !db) return demoStore.get().debts;
+  const { ref, householdId } = await householdCollection("debts");
+  const snap = await getDocs(ref);
+  return snap.docs
+    .map((d) => fromDoc<Debt>(d.id, householdId, d.data()))
+    .sort(
+      (a, b) =>
+        (a.payoffPriority ?? Number.MAX_SAFE_INTEGER) -
+        (b.payoffPriority ?? Number.MAX_SAFE_INTEGER),
+    );
 }
 
 export async function fetchGoals(): Promise<Goal[]> {
-  if (isDemoMode || !supabase) return demoStore.get().goals;
-  const { data, error } = await supabase.from("goals").select("*").order("name");
-  if (error) throw error;
-  return (data ?? []).map(mapGoal);
+  if (isDemoMode || !db) return demoStore.get().goals;
+  const { ref, householdId } = await householdCollection("goals");
+  const snap = await getDocs(query(ref, orderBy("name")));
+  return snap.docs.map((d) => fromDoc<Goal>(d.id, householdId, d.data()));
 }
 
 export async function fetchPaychecks(): Promise<Paycheck[]> {
-  if (isDemoMode || !supabase) return demoStore.get().paychecks;
-  const { data, error } = await supabase
-    .from("paychecks")
-    .select("*, paycheck_allocations(label, amount, kind)")
-    .order("pay_date");
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    householdId: row.household_id,
-    memberName: row.member_name,
-    payDate: row.pay_date,
-    netAmount: Number(row.net_amount ?? 0),
-    startingBalance: Number(row.starting_balance ?? 0),
-    allocations: (row.paycheck_allocations ?? []).map(
-      (allocation: { label: string; amount: number; kind: string }) => ({
-        label: allocation.label,
-        amount: Number(allocation.amount ?? 0),
-        kind: allocation.kind as Paycheck["allocations"][number]["kind"],
-      }),
-    ),
-  }));
+  if (isDemoMode || !db) return demoStore.get().paychecks;
+  const { ref, householdId } = await householdCollection("paychecks");
+  const snap = await getDocs(query(ref, orderBy("payDate")));
+  return snap.docs.map((d) => fromDoc<Paycheck>(d.id, householdId, d.data()));
 }
 
 export async function fetchNetWorthHistory(): Promise<
   { month: string; netWorth: number }[]
 > {
-  if (isDemoMode || !supabase) return demoStore.get().netWorthHistory;
-  const { data, error } = await supabase
-    .from("net_worth_snapshots")
-    .select("*")
-    .order("month");
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
-    month: String(row.month).slice(0, 7),
-    netWorth: Number(row.net_worth ?? 0),
-  }));
+  if (isDemoMode || !db) return demoStore.get().netWorthHistory;
+  const { ref } = await householdCollection("netWorthSnapshots");
+  const snap = await getDocs(ref);
+  return snap.docs
+    .map((d) => ({
+      month: d.id,
+      netWorth: Number(d.data().netWorth ?? 0),
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month));
 }
 
-/* ---------- Mutations ---------- */
+/* ---------- Category rules ---------- */
+
+/** Deterministic doc id gives upsert-by-pattern semantics. */
+function ruleDocId(merchantPattern: string): string {
+  return merchantPattern
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120) || "rule";
+}
+
+export async function fetchCategoryRules(): Promise<CategoryRule[]> {
+  if (isDemoMode || !db) return demoStore.get().categoryRules;
+  const { ref, householdId } = await householdCollection("categoryRules");
+  const snap = await getDocs(query(ref, orderBy("merchantPattern")));
+  return snap.docs.map((d) =>
+    fromDoc<CategoryRule>(d.id, householdId, d.data()),
+  );
+}
+
+/** Returns the category for a merchant, per the household's learned rules. */
+export function applyCategoryRules(
+  merchant: string,
+  rules: CategoryRule[],
+): string | undefined {
+  const lowered = merchant.toLowerCase();
+  return rules.find((rule) =>
+    lowered.includes(rule.merchantPattern.toLowerCase()),
+  )?.categoryId;
+}
+
+export async function upsertCategoryRule(
+  merchantPattern: string,
+  categoryId: string,
+): Promise<void> {
+  if (isDemoMode || !db) {
+    demoStore.upsertCategoryRule({
+      id: newId("rule"),
+      householdId: demoStore.get().household.id,
+      merchantPattern,
+      categoryId,
+    });
+    return;
+  }
+  const { ref } = await householdCollection("categoryRules");
+  await setDoc(doc(ref, ruleDocId(merchantPattern)), {
+    merchantPattern: merchantPattern.toLowerCase().trim(),
+    categoryId,
+  });
+}
+
+export async function deleteCategoryRule(ruleId: string): Promise<void> {
+  if (isDemoMode || !db) {
+    demoStore.deleteCategoryRule(ruleId);
+    return;
+  }
+  const { ref } = await householdCollection("categoryRules");
+  await deleteDoc(doc(ref, ruleId));
+}
+
+/* ---------- Transactions ---------- */
 
 export interface NewTransactionInput {
   accountId: string;
@@ -292,10 +289,16 @@ export interface NewTransactionInput {
   notes?: string;
 }
 
+function stripUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, v]) => v !== undefined),
+  ) as T;
+}
+
 export async function createTransaction(
   input: NewTransactionInput,
 ): Promise<void> {
-  if (isDemoMode || !supabase) {
+  if (isDemoMode || !db) {
     demoStore.addTransaction({
       id: newId("tx"),
       householdId: demoStore.get().household.id,
@@ -304,19 +307,62 @@ export async function createTransaction(
     });
     return;
   }
-  const household = await fetchHousehold();
-  const { error } = await supabase.from("transactions").insert({
-    household_id: household.id,
-    account_id: input.accountId,
-    transaction_date: input.transactionDate,
-    merchant: input.merchant,
-    amount: input.amount,
-    transaction_type: input.transactionType,
-    category_id: input.categoryId ?? null,
-    notes: input.notes ?? null,
-  });
-  if (error) throw error;
+  const { ref } = await householdCollection("transactions");
+  await setDoc(doc(ref), stripUndefined({ status: "posted", ...input }));
 }
+
+export async function importTransactions(
+  inputs: NewTransactionInput[],
+): Promise<number> {
+  if (inputs.length === 0) return 0;
+  if (isDemoMode || !db) {
+    const householdId = demoStore.get().household.id;
+    demoStore.addTransactions(
+      inputs.map((input) => ({
+        id: newId("tx"),
+        householdId,
+        status: "posted" as const,
+        ...input,
+      })),
+    );
+    return inputs.length;
+  }
+  const { ref } = await householdCollection("transactions");
+  const batch = writeBatch(db);
+  for (const input of inputs) {
+    batch.set(doc(ref), stripUndefined({ status: "posted", ...input }));
+  }
+  await batch.commit();
+  return inputs.length;
+}
+
+export async function updateTransactionCategory(
+  transactionId: string,
+  categoryId: string | undefined,
+): Promise<void> {
+  if (isDemoMode || !db) {
+    demoStore.updateTransaction(transactionId, { categoryId });
+    return;
+  }
+  const { ref } = await householdCollection("transactions");
+  await updateDoc(doc(ref, transactionId), {
+    categoryId: categoryId ?? null,
+  });
+}
+
+export async function updateTransactionStatus(
+  transactionId: string,
+  status: TransactionStatus,
+): Promise<void> {
+  if (isDemoMode || !db) {
+    demoStore.updateTransaction(transactionId, { status });
+    return;
+  }
+  const { ref } = await householdCollection("transactions");
+  await updateDoc(doc(ref, transactionId), { status });
+}
+
+/* ---------- Bills ---------- */
 
 export interface NewBillInput {
   name: string;
@@ -328,17 +374,16 @@ export interface NewBillInput {
   paymentAccountId?: string;
 }
 
-export async function createBill(input: NewBillInput): Promise<void> {
+function nextDueDate(dueDay: number): string {
   const today = new Date();
-  const dueThisMonth = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    Math.min(input.dueDay, 28),
-  );
-  if (dueThisMonth < today) dueThisMonth.setMonth(dueThisMonth.getMonth() + 1);
-  const dueDate = dueThisMonth.toISOString().slice(0, 10);
+  const due = new Date(today.getFullYear(), today.getMonth(), Math.min(dueDay, 28));
+  if (due < today) due.setMonth(due.getMonth() + 1);
+  return due.toISOString().slice(0, 10);
+}
 
-  if (isDemoMode || !supabase) {
+export async function createBill(input: NewBillInput): Promise<void> {
+  const dueDate = nextDueDate(input.dueDay);
+  if (isDemoMode || !db) {
     const billId = newId("bill");
     demoStore.addBill(
       {
@@ -360,32 +405,43 @@ export async function createBill(input: NewBillInput): Promise<void> {
     );
     return;
   }
-  const household = await fetchHousehold();
-  const { data, error } = await supabase
-    .from("bills")
-    .insert({
-      household_id: household.id,
+  const { ref } = await householdCollection("bills");
+  const occurrences = await householdCollection("billOccurrences");
+  const billRef = doc(ref);
+  const batch = writeBatch(db);
+  batch.set(billRef, stripUndefined({ isActive: true, ...input }));
+  batch.set(
+    doc(occurrences.ref),
+    stripUndefined({
+      billId: billRef.id,
       name: input.name,
-      expected_amount: input.expectedAmount,
-      due_day: input.dueDay,
-      frequency: input.frequency,
+      dueDate,
+      expectedAmount: input.expectedAmount,
+      status: "scheduled",
       autopay: input.autopay,
-      category_id: input.categoryId ?? null,
-      payment_account_id: input.paymentAccountId ?? null,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  const { error: occurrenceError } = await supabase
-    .from("bill_occurrences")
-    .insert({
-      bill_id: data.id,
-      household_id: household.id,
-      due_date: dueDate,
-      expected_amount: input.expectedAmount,
-    });
-  if (occurrenceError) throw occurrenceError;
+      paymentAccountId: input.paymentAccountId,
+    }),
+  );
+  await batch.commit();
 }
+
+export async function markBillPaid(
+  occurrenceId: string,
+  actualAmount?: number,
+): Promise<void> {
+  if (isDemoMode || !db) {
+    demoStore.markBillPaid(occurrenceId, actualAmount);
+    return;
+  }
+  const { ref } = await householdCollection("billOccurrences");
+  await updateDoc(doc(ref, occurrenceId), {
+    status: "paid",
+    ...(actualAmount != null ? { actualAmount } : {}),
+    paidDate: new Date().toISOString().slice(0, 10),
+  });
+}
+
+/* ---------- Accounts ---------- */
 
 export interface NewAccountInput {
   name: string;
@@ -399,7 +455,7 @@ export interface NewAccountInput {
 }
 
 export async function createAccount(input: NewAccountInput): Promise<void> {
-  if (isDemoMode || !supabase) {
+  if (isDemoMode || !db) {
     demoStore.addAccount({
       id: newId("acc"),
       householdId: demoStore.get().household.id,
@@ -409,35 +465,29 @@ export async function createAccount(input: NewAccountInput): Promise<void> {
     });
     return;
   }
-  const household = await fetchHousehold();
-  const { error } = await supabase.from("accounts").insert({
-    household_id: household.id,
-    name: input.name,
-    institution: input.institution ?? null,
-    account_type: input.accountType,
-    last_four: input.lastFour ?? null,
-    current_balance: input.currentBalance,
-    credit_limit: input.creditLimit ?? null,
-    interest_rate: input.interestRate ?? null,
-    include_in_safe_to_spend: input.includeInSafeToSpend,
-  });
-  if (error) throw error;
+  const { ref } = await householdCollection("accounts");
+  await setDoc(
+    doc(ref),
+    stripUndefined({ includeInNetWorth: true, isActive: true, ...input }),
+  );
 }
 
 export async function updateAccountBalance(
   accountId: string,
   balance: number,
 ): Promise<void> {
-  if (isDemoMode || !supabase) {
+  if (isDemoMode || !db) {
     demoStore.updateAccountBalance(accountId, balance);
     return;
   }
-  const { error } = await supabase
-    .from("accounts")
-    .update({ current_balance: balance, available_balance: balance })
-    .eq("id", accountId);
-  if (error) throw error;
+  const { ref } = await householdCollection("accounts");
+  await updateDoc(doc(ref, accountId), {
+    currentBalance: balance,
+    availableBalance: balance,
+  });
 }
+
+/* ---------- Debts ---------- */
 
 export interface NewDebtInput {
   name: string;
@@ -450,7 +500,7 @@ export interface NewDebtInput {
 }
 
 export async function createDebt(input: NewDebtInput): Promise<void> {
-  if (isDemoMode || !supabase) {
+  if (isDemoMode || !db) {
     demoStore.addDebt({
       id: newId("debt"),
       householdId: demoStore.get().household.id,
@@ -458,19 +508,11 @@ export async function createDebt(input: NewDebtInput): Promise<void> {
     });
     return;
   }
-  const household = await fetchHousehold();
-  const { error } = await supabase.from("debts").insert({
-    household_id: household.id,
-    name: input.name,
-    debt_type: input.debtType,
-    current_balance: input.currentBalance,
-    minimum_payment: input.minimumPayment,
-    annual_interest_rate: input.annualInterestRate,
-    credit_limit: input.creditLimit ?? null,
-    due_day: input.dueDay ?? null,
-  });
-  if (error) throw error;
+  const { ref } = await householdCollection("debts");
+  await setDoc(doc(ref), stripUndefined({ ...input }));
 }
+
+/* ---------- Goals ---------- */
 
 export interface NewGoalInput {
   name: string;
@@ -482,7 +524,7 @@ export interface NewGoalInput {
 }
 
 export async function createGoal(input: NewGoalInput): Promise<void> {
-  if (isDemoMode || !supabase) {
+  if (isDemoMode || !db) {
     demoStore.addGoal({
       id: newId("goal"),
       householdId: demoStore.get().household.id,
@@ -490,175 +532,87 @@ export async function createGoal(input: NewGoalInput): Promise<void> {
     });
     return;
   }
-  const household = await fetchHousehold();
-  const { error } = await supabase.from("goals").insert({
-    household_id: household.id,
-    name: input.name,
-    goal_type: input.goalType,
-    target_amount: input.targetAmount,
-    current_amount: input.currentAmount,
-    target_date: input.targetDate ?? null,
-    monthly_contribution: input.monthlyContribution ?? null,
-  });
-  if (error) throw error;
+  const { ref } = await householdCollection("goals");
+  await setDoc(doc(ref), stripUndefined({ ...input }));
 }
 
-/* ---------- Category rules ---------- */
-
-export async function fetchCategoryRules(): Promise<CategoryRule[]> {
-  if (isDemoMode || !supabase) return demoStore.get().categoryRules;
-  const { data, error } = await supabase
-    .from("category_rules")
-    .select("*")
-    .order("merchant_pattern");
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    householdId: row.household_id,
-    merchantPattern: row.merchant_pattern,
-    categoryId: row.category_id,
-  }));
-}
-
-/** Returns the category for a merchant, per the household's learned rules. */
-export function applyCategoryRules(
-  merchant: string,
-  rules: CategoryRule[],
-): string | undefined {
-  const lowered = merchant.toLowerCase();
-  return rules.find((rule) =>
-    lowered.includes(rule.merchantPattern.toLowerCase()),
-  )?.categoryId;
-}
-
-export async function upsertCategoryRule(
-  merchantPattern: string,
-  categoryId: string,
+export async function contributeToGoal(
+  goalId: string,
+  amount: number,
 ): Promise<void> {
-  if (isDemoMode || !supabase) {
-    demoStore.upsertCategoryRule({
-      id: newId("rule"),
+  if (isDemoMode || !db) {
+    demoStore.contributeToGoal(goalId, amount);
+    return;
+  }
+  const { ref } = await householdCollection("goals");
+  await updateDoc(doc(ref, goalId), { currentAmount: increment(amount) });
+}
+
+/* ---------- Categories & snapshots ---------- */
+
+export async function updateCategoryTarget(
+  categoryId: string,
+  monthlyTarget: number,
+): Promise<void> {
+  if (isDemoMode || !db) {
+    demoStore.updateCategoryTarget(categoryId, monthlyTarget);
+    return;
+  }
+  const { ref } = await householdCollection("categories");
+  await updateDoc(doc(ref, categoryId), { monthlyTarget });
+}
+
+export async function recordNetWorthSnapshot(
+  month: string,
+  netWorth: number,
+): Promise<void> {
+  if (isDemoMode || !db) {
+    demoStore.recordNetWorthSnapshot(month, netWorth);
+    return;
+  }
+  const { ref } = await householdCollection("netWorthSnapshots");
+  await setDoc(doc(ref, month), { netWorth });
+}
+
+/* ---------- Paychecks ---------- */
+
+export interface NewPaycheckInput {
+  memberName: string;
+  payDate: string;
+  netAmount: number;
+  startingBalance: number;
+  allocations: Paycheck["allocations"];
+}
+
+export async function createPaycheck(input: NewPaycheckInput): Promise<void> {
+  if (isDemoMode || !db) {
+    demoStore.addPaycheck({
+      id: newId("pay"),
       householdId: demoStore.get().household.id,
-      merchantPattern,
-      categoryId,
+      ...input,
     });
     return;
   }
-  const household = await fetchHousehold();
-  const { error } = await supabase.from("category_rules").upsert(
-    {
-      household_id: household.id,
-      merchant_pattern: merchantPattern.toLowerCase(),
-      category_id: categoryId,
-    },
-    { onConflict: "household_id,merchant_pattern" },
-  );
-  if (error) throw error;
-}
-
-export async function deleteCategoryRule(ruleId: string): Promise<void> {
-  if (isDemoMode || !supabase) {
-    demoStore.deleteCategoryRule(ruleId);
-    return;
-  }
-  const { error } = await supabase
-    .from("category_rules")
-    .delete()
-    .eq("id", ruleId);
-  if (error) throw error;
-}
-
-/* ---------- Bulk import & ledger updates ---------- */
-
-export async function importTransactions(
-  inputs: NewTransactionInput[],
-): Promise<number> {
-  if (inputs.length === 0) return 0;
-  if (isDemoMode || !supabase) {
-    const householdId = demoStore.get().household.id;
-    demoStore.addTransactions(
-      inputs.map((input) => ({
-        id: newId("tx"),
-        householdId,
-        status: "posted" as const,
-        ...input,
-      })),
-    );
-    return inputs.length;
-  }
-  const household = await fetchHousehold();
-  const { error } = await supabase.from("transactions").insert(
-    inputs.map((input) => ({
-      household_id: household.id,
-      account_id: input.accountId,
-      transaction_date: input.transactionDate,
-      merchant: input.merchant,
-      amount: input.amount,
-      transaction_type: input.transactionType,
-      category_id: input.categoryId ?? null,
-      notes: input.notes ?? null,
-    })),
-  );
-  if (error) throw error;
-  return inputs.length;
-}
-
-export async function updateTransactionCategory(
-  transactionId: string,
-  categoryId: string | undefined,
-): Promise<void> {
-  if (isDemoMode || !supabase) {
-    demoStore.updateTransaction(transactionId, { categoryId });
-    return;
-  }
-  const { error } = await supabase
-    .from("transactions")
-    .update({ category_id: categoryId ?? null })
-    .eq("id", transactionId);
-  if (error) throw error;
-}
-
-export async function updateTransactionStatus(
-  transactionId: string,
-  status: TransactionStatus,
-): Promise<void> {
-  if (isDemoMode || !supabase) {
-    demoStore.updateTransaction(transactionId, { status });
-    return;
-  }
-  const { error } = await supabase
-    .from("transactions")
-    .update({ status })
-    .eq("id", transactionId);
-  if (error) throw error;
+  const { ref } = await householdCollection("paychecks");
+  await setDoc(doc(ref), stripUndefined({ ...input }));
 }
 
 /* ---------- Documents ---------- */
 
 export async function fetchDocuments(): Promise<DocumentRecord[]> {
-  if (isDemoMode || !supabase) return demoStore.get().documents;
-  const { data, error } = await supabase
-    .from("documents")
-    .select("*")
-    .order("uploaded_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    householdId: row.household_id,
-    folder: row.folder,
-    name: row.name,
-    mimeType: row.mime_type,
-    sizeBytes: Number(row.size_bytes ?? 0),
-    storagePath: row.storage_path ?? undefined,
-    uploadedAt: row.uploaded_at,
-  }));
+  if (isDemoMode || !db) return demoStore.get().documents;
+  const { ref, householdId } = await householdCollection("documents");
+  const snap = await getDocs(query(ref, orderBy("uploadedAt", "desc")));
+  return snap.docs.map((d) =>
+    fromDoc<DocumentRecord>(d.id, householdId, d.data()),
+  );
 }
 
 export async function uploadDocument(
   folder: DocumentFolder,
   file: File,
 ): Promise<void> {
-  if (isDemoMode || !supabase) {
+  if (isDemoMode || !db || !storage) {
     const id = newId("doc");
     await putBlob(id, file);
     demoStore.addDocument({
@@ -672,173 +626,43 @@ export async function uploadDocument(
     });
     return;
   }
-  const household = await fetchHousehold();
-  const storagePath = `${household.id}/${crypto.randomUUID()}-${file.name}`;
-  const { error: storageError } = await supabase.storage
-    .from("documents")
-    .upload(storagePath, file);
-  if (storageError) throw storageError;
-  const { error } = await supabase.from("documents").insert({
-    household_id: household.id,
+  const { ref, householdId } = await householdCollection("documents");
+  const documentRef = doc(ref);
+  const storagePath = `documents/${householdId}/${documentRef.id}-${file.name}`;
+  await uploadBytes(storageRef(storage, storagePath), file, {
+    contentType: file.type || "application/octet-stream",
+  });
+  await setDoc(documentRef, {
     folder,
     name: file.name,
-    mime_type: file.type || "application/octet-stream",
-    size_bytes: file.size,
-    storage_path: storagePath,
+    mimeType: file.type || "application/octet-stream",
+    sizeBytes: file.size,
+    storagePath,
+    uploadedAt: new Date().toISOString(),
   });
-  if (error) throw error;
 }
 
 export async function getDocumentBlob(
   document: DocumentRecord,
 ): Promise<Blob | undefined> {
-  if (isDemoMode || !supabase) return getBlob(document.id);
+  if (isDemoMode || !storage) return getBlob(document.id);
   if (!document.storagePath) return undefined;
-  const { data, error } = await supabase.storage
-    .from("documents")
-    .download(document.storagePath);
-  if (error) throw error;
-  return data;
+  return storageGetBlob(storageRef(storage, document.storagePath));
 }
 
 export async function deleteDocument(
   document: DocumentRecord,
 ): Promise<void> {
-  if (isDemoMode || !supabase) {
+  if (isDemoMode || !db || !storage) {
     await deleteBlob(document.id);
     demoStore.deleteDocument(document.id);
     return;
   }
   if (document.storagePath) {
-    const { error: storageError } = await supabase.storage
-      .from("documents")
-      .remove([document.storagePath]);
-    if (storageError) throw storageError;
-  }
-  const { error } = await supabase
-    .from("documents")
-    .delete()
-    .eq("id", document.id);
-  if (error) throw error;
-}
-
-export interface NewPaycheckInput {
-  memberName: string;
-  payDate: string;
-  netAmount: number;
-  startingBalance: number;
-  allocations: Paycheck["allocations"];
-}
-
-export async function createPaycheck(input: NewPaycheckInput): Promise<void> {
-  if (isDemoMode || !supabase) {
-    demoStore.addPaycheck({
-      id: newId("pay"),
-      householdId: demoStore.get().household.id,
-      ...input,
+    await deleteObject(storageRef(storage, document.storagePath)).catch(() => {
+      // Metadata cleanup still proceeds when the object is already gone.
     });
-    return;
   }
-  const household = await fetchHousehold();
-  const { data, error } = await supabase
-    .from("paychecks")
-    .insert({
-      household_id: household.id,
-      member_name: input.memberName,
-      pay_date: input.payDate,
-      net_amount: input.netAmount,
-      starting_balance: input.startingBalance,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  if (input.allocations.length > 0) {
-    const { error: allocationError } = await supabase
-      .from("paycheck_allocations")
-      .insert(
-        input.allocations.map((allocation) => ({
-          paycheck_id: data.id,
-          household_id: household.id,
-          label: allocation.label,
-          amount: allocation.amount,
-          kind: allocation.kind,
-        })),
-      );
-    if (allocationError) throw allocationError;
-  }
-}
-
-export async function contributeToGoal(
-  goalId: string,
-  amount: number,
-): Promise<void> {
-  if (isDemoMode || !supabase) {
-    demoStore.contributeToGoal(goalId, amount);
-    return;
-  }
-  const { data, error } = await supabase
-    .from("goals")
-    .select("current_amount")
-    .eq("id", goalId)
-    .single();
-  if (error) throw error;
-  const { error: updateError } = await supabase
-    .from("goals")
-    .update({ current_amount: Number(data.current_amount ?? 0) + amount })
-    .eq("id", goalId);
-  if (updateError) throw updateError;
-}
-
-export async function updateCategoryTarget(
-  categoryId: string,
-  monthlyTarget: number,
-): Promise<void> {
-  if (isDemoMode || !supabase) {
-    demoStore.updateCategoryTarget(categoryId, monthlyTarget);
-    return;
-  }
-  const { error } = await supabase
-    .from("categories")
-    .update({ monthly_target: monthlyTarget })
-    .eq("id", categoryId);
-  if (error) throw error;
-}
-
-export async function recordNetWorthSnapshot(
-  month: string,
-  netWorth: number,
-): Promise<void> {
-  if (isDemoMode || !supabase) {
-    demoStore.recordNetWorthSnapshot(month, netWorth);
-    return;
-  }
-  const household = await fetchHousehold();
-  const { error } = await supabase.from("net_worth_snapshots").upsert(
-    {
-      household_id: household.id,
-      month: `${month}-01`,
-      net_worth: netWorth,
-    },
-    { onConflict: "household_id,month" },
-  );
-  if (error) throw error;
-}
-
-export async function markBillPaid(
-  occurrenceId: string,
-  actualAmount?: number,
-): Promise<void> {
-  if (isDemoMode || !supabase) {
-    demoStore.markBillPaid(occurrenceId, actualAmount);
-    return;
-  }
-  const { error } = await supabase
-    .from("bill_occurrences")
-    .update({
-      status: "paid",
-      actual_amount: actualAmount ?? null,
-      paid_date: new Date().toISOString().slice(0, 10),
-    })
-    .eq("id", occurrenceId);
-  if (error) throw error;
+  const { ref } = await householdCollection("documents");
+  await deleteDoc(doc(ref, document.id));
 }

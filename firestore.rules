@@ -1,0 +1,49 @@
+rules_version = '2';
+
+// Every financial record lives under households/{householdId}/... and is
+// readable/writable only by that household's members — the Firestore
+// equivalent of the previous row-level-security model.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(householdId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/households/$(householdId)/members/$(request.auth.uid));
+    }
+
+    function isOwner(householdId) {
+      return isSignedIn()
+        && get(/databases/$(database)/documents/households/$(householdId)).data.ownerUid == request.auth.uid;
+    }
+
+    // Each user's pointer to their household.
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /households/{householdId} {
+      // First sign-in bootstrap: anyone may create a household they own.
+      allow create: if isSignedIn()
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow read, update: if isMember(householdId);
+      allow delete: if false;
+
+      // Membership is managed by the owner (including their own bootstrap doc).
+      match /members/{uid} {
+        allow read: if isMember(householdId);
+        allow create, update, delete: if isOwner(householdId);
+      }
+
+      // All financial collections: accounts, categories, bills,
+      // billOccurrences, transactions, debts, goals, paychecks,
+      // netWorthSnapshots, categoryRules, documents.
+      match /{collection}/{docId} {
+        allow read, write: if collection != 'members' && isMember(householdId);
+      }
+    }
+  }
+}

@@ -12,7 +12,7 @@ import {
 } from "@/hooks/useFinancialData";
 import { getDocumentBlob } from "@/services/dataService";
 import { DOCUMENT_FOLDERS, DocumentFolder, DocumentRecord } from "@/types";
-import { isDemoMode } from "@/services/supabase";
+import { isDemoMode } from "@/services/firebase";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -64,7 +64,7 @@ export function DocumentsPage() {
       {isDemoMode && (
         <div className="demo-banner">
           Demo mode stores files privately in this browser (IndexedDB). With
-          Supabase connected, files live in household-scoped cloud storage.
+          Firebase connected, files live in household-scoped cloud storage.
         </div>
       )}
       <input

@@ -219,8 +219,8 @@ export function ScreenshotImportModal({ onClose }: ScreenshotImportModalProps) {
             <>
               <p style={{ fontSize: "0.88rem", color: "var(--text-secondary)" }}>
                 Screenshot import uses an AI extraction service that runs in a
-                Supabase Edge Function, so it needs the app connected to
-                Supabase with an Anthropic API key configured:
+                Firebase Cloud Function, so it needs the app connected to
+                Firebase with an Anthropic API key configured:
               </p>
               <ol
                 style={{
@@ -232,12 +232,12 @@ export function ScreenshotImportModal({ onClose }: ScreenshotImportModalProps) {
                   margin: 0,
                 }}
               >
-                <li>Connect Supabase (see README) and sign in.</li>
+                <li>Connect Firebase (see README) and sign in.</li>
                 <li>
-                  <code>supabase secrets set ANTHROPIC_API_KEY=sk-ant-…</code>
+                  <code>firebase functions:secrets:set ANTHROPIC_API_KEY</code>
                 </li>
                 <li>
-                  <code>supabase functions deploy extract-screenshot</code>
+                  <code>firebase deploy --only functions</code>
                 </li>
               </ol>
               <Button variant="secondary" onClick={() => beginReview(sampleExtraction)}>

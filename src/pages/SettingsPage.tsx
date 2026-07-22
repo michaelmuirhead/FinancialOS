@@ -2,14 +2,19 @@ import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { useHousehold, useRules } from "@/hooks/useFinancialData";
+import {
+  useHousehold,
+  useRules,
+  useUpdateRules,
+} from "@/hooks/useFinancialData";
 import { demoStore } from "@/data/demoStore";
-import { isDemoMode } from "@/services/supabase";
+import { isDemoMode } from "@/services/firebase";
 import { useQueryClient } from "@tanstack/react-query";
 
 export function SettingsPage() {
   const { data: household } = useHousehold();
   const { data: rules } = useRules();
+  const updateRules = useUpdateRules();
   const queryClient = useQueryClient();
   const [buffer, setBuffer] = useState<number | null>(null);
 
@@ -17,8 +22,7 @@ export function SettingsPage() {
 
   function saveRules() {
     if (!rules) return;
-    demoStore.updateRules({ ...rules, minimumCheckingBuffer: currentBuffer });
-    queryClient.invalidateQueries();
+    updateRules.mutate({ ...rules, minimumCheckingBuffer: currentBuffer });
   }
 
   return (
@@ -44,7 +48,7 @@ export function SettingsPage() {
             </div>
             <div className="data-list__row">
               <span>Backend</span>
-              <span>{isDemoMode ? "Demo mode (local data)" : "Supabase"}</span>
+              <span>{isDemoMode ? "Demo mode (local data)" : "Firebase"}</span>
             </div>
           </div>
         </Card>

@@ -37,12 +37,18 @@ import {
   recordNetWorthSnapshot,
   updateAccountBalance,
   updateCategoryTarget,
+  updateHouseholdRules,
   updateTransactionCategory,
   updateTransactionStatus,
   uploadDocument,
   upsertCategoryRule,
 } from "@/services/dataService";
-import { DocumentFolder, DocumentRecord, TransactionStatus } from "@/types";
+import {
+  DocumentFolder,
+  DocumentRecord,
+  HouseholdRules,
+  TransactionStatus,
+} from "@/types";
 import { getDashboardSummary } from "@/services/dashboardService";
 
 export function useHousehold() {
@@ -211,6 +217,14 @@ export function useUpdateTransactionStatus() {
       transactionId: string;
       status: TransactionStatus;
     }) => updateTransactionStatus(transactionId, status),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+export function useUpdateRules() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (rules: HouseholdRules) => updateHouseholdRules(rules),
     onSuccess: () => queryClient.invalidateQueries(),
   });
 }

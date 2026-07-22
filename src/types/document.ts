@@ -22,7 +22,7 @@ export interface DocumentRecord {
   name: string;
   mimeType: string;
   sizeBytes: number;
-  /** Supabase Storage object path; demo mode stores blobs in IndexedDB by id. */
+  /** Cloud storage object path; demo mode stores blobs in IndexedDB by id. */
   storagePath?: string;
   uploadedAt: string;
 }

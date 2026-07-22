@@ -1,9 +1,10 @@
+import { httpsCallable } from "firebase/functions";
 import { ScreenshotExtraction } from "@/lib/screenshot";
-import { isDemoMode, supabase } from "./supabase";
+import { functions, isDemoMode } from "./firebase";
 
-/** Screenshot extraction needs the Edge Function, which needs Supabase. */
+/** Screenshot extraction runs in a Firebase Cloud Function. */
 export function isScreenshotImportAvailable(): boolean {
-  return !isDemoMode && supabase != null;
+  return !isDemoMode && functions != null;
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -21,25 +22,21 @@ function fileToBase64(file: File): Promise<string> {
 export async function extractFromScreenshot(
   file: File,
 ): Promise<ScreenshotExtraction> {
-  if (!supabase) {
+  if (!functions) {
     throw new Error(
-      "Screenshot import requires Supabase — see the setup notes in the README.",
+      "Screenshot import requires Firebase — see the setup notes in the README.",
     );
   }
   const image = await fileToBase64(file);
-  const { data, error } = await supabase.functions.invoke(
-    "extract-screenshot",
-    {
-      body: { image, mediaType: file.type || "image/png" },
-    },
-  );
-  if (error) {
-    throw new Error(error.message ?? "Extraction failed");
-  }
-  if (data?.error) {
-    throw new Error(String(data.error));
-  }
-  const extraction = data?.extraction as ScreenshotExtraction | undefined;
+  const callable = httpsCallable<
+    { image: string; mediaType: string },
+    { extraction: ScreenshotExtraction }
+  >(functions, "extractScreenshot");
+  const result = await callable({
+    image,
+    mediaType: file.type || "image/png",
+  });
+  const extraction = result.data?.extraction;
   if (!extraction) {
     throw new Error("The extraction service returned an empty result.");
   }

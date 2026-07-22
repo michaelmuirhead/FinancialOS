@@ -1,5 +1,7 @@
 node_modules/
 dist/
+.firebase/
+*-debug.log
 dev-dist/
 *.local
 .env

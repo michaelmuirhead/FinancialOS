@@ -21,7 +21,7 @@ import {
   useRules,
   useTransactions,
 } from "@/hooks/useFinancialData";
-import { isDemoMode } from "@/services/supabase";
+import { isDemoMode } from "@/services/firebase";
 
 export function DashboardPage() {
   const { data, isLoading, error } = useDashboard();
@@ -48,8 +48,8 @@ export function DashboardPage() {
       />
       {isDemoMode && (
         <div className="demo-banner">
-          Demo mode — showing sample household data. Connect Supabase via
-          VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to use live records.
+          Demo mode — showing sample household data. Connect Firebase via the
+          VITE_FIREBASE_* env vars to use live records.
         </div>
       )}
       <div className="metrics-row">
