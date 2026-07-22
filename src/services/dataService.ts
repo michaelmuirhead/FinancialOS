@@ -4,7 +4,6 @@ import {
   BillOccurrence,
   Category,
   Debt,
-  FinancialAlert,
   Goal,
   Household,
   HouseholdRules,
@@ -123,7 +122,42 @@ export async function fetchAccounts(): Promise<Account[]> {
 }
 
 export async function fetchCategories(): Promise<Category[]> {
-  return demoStore.get().categories;
+  if (isDemoMode || !supabase) return demoStore.get().categories;
+  const { data, error } = await supabase
+    .from("categories")
+    .select("*")
+    .order("name");
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    kind: row.kind,
+    monthlyTarget:
+      row.monthly_target == null ? undefined : Number(row.monthly_target),
+  }));
+}
+
+/**
+ * Bill statuses are derived from the calendar on every read, so a bill
+ * automatically moves Scheduled → Due Soon → Overdue without a background
+ * job. Paid and skipped statuses are always preserved.
+ */
+function deriveOccurrenceStatus(occurrence: BillOccurrence): BillOccurrence {
+  if (occurrence.status === "paid" || occurrence.status === "skipped") {
+    return occurrence;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const soon = new Date();
+  soon.setDate(soon.getDate() + 3);
+  const dueSoonCutoff = soon.toISOString().slice(0, 10);
+
+  const status =
+    occurrence.dueDate < today
+      ? "overdue"
+      : occurrence.dueDate <= dueSoonCutoff
+        ? "due_soon"
+        : "scheduled";
+  return status === occurrence.status ? occurrence : { ...occurrence, status };
 }
 
 export async function fetchBills(): Promise<Bill[]> {
@@ -146,16 +180,16 @@ export async function fetchBills(): Promise<Bill[]> {
 
 export async function fetchBillOccurrences(): Promise<BillOccurrence[]> {
   if (isDemoMode || !supabase) {
-    return [...demoStore.get().billOccurrences].sort((a, b) =>
-      a.dueDate.localeCompare(b.dueDate),
-    );
+    return [...demoStore.get().billOccurrences]
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+      .map(deriveOccurrenceStatus);
   }
   const { data, error } = await supabase
     .from("bill_occurrences")
     .select("*, bills(name, autopay)")
     .order("due_date");
   if (error) throw error;
-  return (data ?? []).map((row) => ({
+  return (data ?? []).map((row) => deriveOccurrenceStatus({
     id: row.id,
     billId: row.bill_id,
     name: row.bills?.name ?? "Bill",
@@ -168,6 +202,7 @@ export async function fetchBillOccurrences(): Promise<BillOccurrence[]> {
     paidDate: row.paid_date ?? undefined,
   }));
 }
+
 
 export async function fetchTransactions(): Promise<Transaction[]> {
   if (isDemoMode || !supabase) {
@@ -202,17 +237,42 @@ export async function fetchGoals(): Promise<Goal[]> {
 }
 
 export async function fetchPaychecks(): Promise<Paycheck[]> {
-  return demoStore.get().paychecks;
-}
-
-export async function fetchAlerts(): Promise<FinancialAlert[]> {
-  return demoStore.get().alerts;
+  if (isDemoMode || !supabase) return demoStore.get().paychecks;
+  const { data, error } = await supabase
+    .from("paychecks")
+    .select("*, paycheck_allocations(label, amount, kind)")
+    .order("pay_date");
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    householdId: row.household_id,
+    memberName: row.member_name,
+    payDate: row.pay_date,
+    netAmount: Number(row.net_amount ?? 0),
+    startingBalance: Number(row.starting_balance ?? 0),
+    allocations: (row.paycheck_allocations ?? []).map(
+      (allocation: { label: string; amount: number; kind: string }) => ({
+        label: allocation.label,
+        amount: Number(allocation.amount ?? 0),
+        kind: allocation.kind as Paycheck["allocations"][number]["kind"],
+      }),
+    ),
+  }));
 }
 
 export async function fetchNetWorthHistory(): Promise<
   { month: string; netWorth: number }[]
 > {
-  return demoStore.get().netWorthHistory;
+  if (isDemoMode || !supabase) return demoStore.get().netWorthHistory;
+  const { data, error } = await supabase
+    .from("net_worth_snapshots")
+    .select("*")
+    .order("month");
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    month: String(row.month).slice(0, 7),
+    netWorth: Number(row.net_worth ?? 0),
+  }));
 }
 
 /* ---------- Mutations ---------- */
@@ -420,6 +480,108 @@ export async function createGoal(input: NewGoalInput): Promise<void> {
     target_date: input.targetDate ?? null,
     monthly_contribution: input.monthlyContribution ?? null,
   });
+  if (error) throw error;
+}
+
+export interface NewPaycheckInput {
+  memberName: string;
+  payDate: string;
+  netAmount: number;
+  startingBalance: number;
+  allocations: Paycheck["allocations"];
+}
+
+export async function createPaycheck(input: NewPaycheckInput): Promise<void> {
+  if (isDemoMode || !supabase) {
+    demoStore.addPaycheck({
+      id: newId("pay"),
+      householdId: demoStore.get().household.id,
+      ...input,
+    });
+    return;
+  }
+  const household = await fetchHousehold();
+  const { data, error } = await supabase
+    .from("paychecks")
+    .insert({
+      household_id: household.id,
+      member_name: input.memberName,
+      pay_date: input.payDate,
+      net_amount: input.netAmount,
+      starting_balance: input.startingBalance,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  if (input.allocations.length > 0) {
+    const { error: allocationError } = await supabase
+      .from("paycheck_allocations")
+      .insert(
+        input.allocations.map((allocation) => ({
+          paycheck_id: data.id,
+          household_id: household.id,
+          label: allocation.label,
+          amount: allocation.amount,
+          kind: allocation.kind,
+        })),
+      );
+    if (allocationError) throw allocationError;
+  }
+}
+
+export async function contributeToGoal(
+  goalId: string,
+  amount: number,
+): Promise<void> {
+  if (isDemoMode || !supabase) {
+    demoStore.contributeToGoal(goalId, amount);
+    return;
+  }
+  const { data, error } = await supabase
+    .from("goals")
+    .select("current_amount")
+    .eq("id", goalId)
+    .single();
+  if (error) throw error;
+  const { error: updateError } = await supabase
+    .from("goals")
+    .update({ current_amount: Number(data.current_amount ?? 0) + amount })
+    .eq("id", goalId);
+  if (updateError) throw updateError;
+}
+
+export async function updateCategoryTarget(
+  categoryId: string,
+  monthlyTarget: number,
+): Promise<void> {
+  if (isDemoMode || !supabase) {
+    demoStore.updateCategoryTarget(categoryId, monthlyTarget);
+    return;
+  }
+  const { error } = await supabase
+    .from("categories")
+    .update({ monthly_target: monthlyTarget })
+    .eq("id", categoryId);
+  if (error) throw error;
+}
+
+export async function recordNetWorthSnapshot(
+  month: string,
+  netWorth: number,
+): Promise<void> {
+  if (isDemoMode || !supabase) {
+    demoStore.recordNetWorthSnapshot(month, netWorth);
+    return;
+  }
+  const household = await fetchHousehold();
+  const { error } = await supabase.from("net_worth_snapshots").upsert(
+    {
+      household_id: household.id,
+      month: `${month}-01`,
+      net_worth: netWorth,
+    },
+    { onConflict: "household_id,month" },
+  );
   if (error) throw error;
 }
 

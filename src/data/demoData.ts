@@ -4,7 +4,6 @@ import {
   BillOccurrence,
   Category,
   Debt,
-  FinancialAlert,
   Goal,
   Household,
   HouseholdRules,
@@ -671,37 +670,6 @@ export const demoPaychecks: Paycheck[] = [
       { label: "Savings", amount: 150, kind: "savings" },
       { label: "Required buffer", amount: 500, kind: "buffer" },
     ],
-  },
-];
-
-export const demoAlerts: FinancialAlert[] = [
-  {
-    id: "alert-utilization",
-    priority: "attention",
-    title: "Discover utilization is 40%",
-    detail: "Above your 30% warning threshold. Paying $800 brings it under 30%.",
-    createdAt: isoDaysFromNow(-1),
-  },
-  {
-    id: "alert-electric",
-    priority: "info",
-    title: "Electric bill $35 above average",
-    detail: "This month: $156 · 12-month average: $121.",
-    createdAt: isoDaysFromNow(-2),
-  },
-  {
-    id: "alert-restaurants",
-    priority: "attention",
-    title: "Restaurants budget at 78%",
-    detail: "$195 of $250 used with 10 days left in the month.",
-    createdAt: isoDaysFromNow(-1),
-  },
-  {
-    id: "alert-emergency",
-    priority: "info",
-    title: "Emergency fund at 1.2 months of coverage",
-    detail: "Target is 3 months ($15,000). Current pace reaches it in 30 months.",
-    createdAt: isoDaysFromNow(-4),
   },
 ];
 

@@ -87,10 +87,14 @@ supabase/
 
 ## Construction phases
 
-1. **Foundation (this build):** shell, dashboard, accounts, bills,
-   transactions, goals, calculations, PWA, demo mode, Supabase schema
-2. **Planning tools:** live paycheck planner, budget targets, net-worth
-   snapshots, alert engine
+1. **Foundation (done):** shell, dashboard, accounts, bills, transactions,
+   goals, calculations, PWA, demo mode, Supabase schema
+2. **Planning tools (done):** record paychecks with allocations and
+   overdraft forecasting, editable budget targets, goal contributions,
+   generated alert engine (utilization, overdue/due-soon bills, budget
+   thresholds, low buffer, emergency-fund coverage, bill variance),
+   automatic bill status transitions, debt strategy comparison, net-worth
+   snapshots
 3. **Imports & documents:** CSV import, statement upload, reconciliation
 4. **Intelligence:** anomaly alerts, cash-flow forecasts, monthly review
 5. **Advanced:** bank-data integration, push notifications, tax projection

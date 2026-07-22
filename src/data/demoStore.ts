@@ -4,7 +4,6 @@ import {
   BillOccurrence,
   Category,
   Debt,
-  FinancialAlert,
   Goal,
   Household,
   HouseholdRules,
@@ -13,7 +12,6 @@ import {
 } from "@/types";
 import {
   demoAccounts,
-  demoAlerts,
   demoBillOccurrences,
   demoBills,
   demoCategories,
@@ -37,11 +35,10 @@ interface DemoState {
   debts: Debt[];
   goals: Goal[];
   paychecks: Paycheck[];
-  alerts: FinancialAlert[];
   netWorthHistory: { month: string; netWorth: number }[];
 }
 
-const STORAGE_KEY = "homevault-demo-state-v1";
+const STORAGE_KEY = "homevault-demo-state-v2";
 
 function seedState(): DemoState {
   return {
@@ -55,7 +52,6 @@ function seedState(): DemoState {
     debts: demoDebts,
     goals: demoGoals,
     paychecks: demoPaychecks,
-    alerts: demoAlerts,
     netWorthHistory: demoNetWorthHistory,
   };
 }
@@ -134,6 +130,39 @@ export const demoStore = {
 
   updateRules(rules: HouseholdRules): void {
     state.rules = rules;
+    persist();
+  },
+
+  addPaycheck(paycheck: Paycheck): void {
+    state.paychecks = [...state.paychecks, paycheck].sort((a, b) =>
+      a.payDate.localeCompare(b.payDate),
+    );
+    persist();
+  },
+
+  contributeToGoal(goalId: string, amount: number): void {
+    state.goals = state.goals.map((goal) =>
+      goal.id === goalId
+        ? { ...goal, currentAmount: goal.currentAmount + amount }
+        : goal,
+    );
+    persist();
+  },
+
+  updateCategoryTarget(categoryId: string, monthlyTarget: number): void {
+    state.categories = state.categories.map((category) =>
+      category.id === categoryId ? { ...category, monthlyTarget } : category,
+    );
+    persist();
+  },
+
+  recordNetWorthSnapshot(month: string, netWorth: number): void {
+    const existing = state.netWorthHistory.filter(
+      (point) => point.month !== month,
+    );
+    state.netWorthHistory = [...existing, { month, netWorth }].sort((a, b) =>
+      a.month.localeCompare(b.month),
+    );
     persist();
   },
 };

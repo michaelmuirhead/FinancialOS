@@ -138,6 +138,59 @@ export function DebtPage() {
           )}
         </Card>
       </div>
+      <Card title="Strategy comparison" className="page-section">
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Strategy</th>
+                <th>Order</th>
+                <th className="num">Months</th>
+                <th className="num">Projected interest</th>
+              </tr>
+            </thead>
+            <tbody>
+              {STRATEGIES.map((s) => {
+                const result = list.length
+                  ? projectPayoff(list, extra, s.value)
+                  : undefined;
+                const first = list.length
+                  ? orderDebtsByStrategy(list, s.value)[0]?.name
+                  : "—";
+                return (
+                  <tr key={s.value}>
+                    <td>
+                      {s.label}
+                      {s.value === strategy && (
+                        <>
+                          {" "}
+                          <StatusBadge tone="blue">Selected</StatusBadge>
+                        </>
+                      )}
+                    </td>
+                    <td>{first} first</td>
+                    <td className="num">{result?.months ?? "—"}</td>
+                    <td className="num">
+                      {result ? formatCurrency(result.totalInterest) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p
+          style={{
+            fontSize: "0.75rem",
+            color: "var(--text-secondary)",
+            marginTop: 8,
+          }}
+        >
+          All strategies assume minimum payments on every debt plus{" "}
+          {formatCurrency(extra)} extra applied to the focus debt, rolling
+          freed-up payments forward as debts are eliminated.
+        </p>
+      </Card>
       <Card title={`Payoff order — ${STRATEGIES.find((s) => s.value === strategy)?.label}`}>
         <div className="data-list">
           {ordered.map((debt, index) => {

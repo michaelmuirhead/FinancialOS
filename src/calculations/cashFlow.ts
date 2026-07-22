@@ -11,9 +11,13 @@ export interface CashFlowPoint {
 /**
  * Builds a daily cash-flow series from posted transactions, then extends
  * it with a forecast built from scheduled paychecks and unpaid bills.
+ *
+ * `currentBalance` is today's actual balance: the historical portion is
+ * anchored so the series passes through exactly that value today, and the
+ * forecast continues forward from it.
  */
 export function buildCashFlowSeries(
-  startingBalance: number,
+  currentBalance: number,
   transactions: Transaction[],
   upcomingBills: BillOccurrence[],
   upcomingPaychecks: Paycheck[],
@@ -22,11 +26,11 @@ export function buildCashFlowSeries(
 ): CashFlowPoint[] {
   const today = new Date();
   const points: CashFlowPoint[] = [];
-  let balance = startingBalance;
 
   const byDate = (iso: string) =>
     transactions.filter((t) => t.transactionDate === iso);
 
+  const dayNets: { iso: string; income: number; expenses: number }[] = [];
   for (let i = daysBack; i >= 0; i--) {
     const day = new Date(today);
     day.setDate(day.getDate() - i);
@@ -38,8 +42,23 @@ export function buildCashFlowSeries(
     const expenses = dayTx
       .filter((t) => t.transactionType === "expense")
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-    balance += income - expenses;
-    points.push({ date: iso, income, expenses, runningBalance: balance });
+    dayNets.push({ iso, income, expenses });
+  }
+
+  const totalPastNet = dayNets.reduce(
+    (sum, day) => sum + day.income - day.expenses,
+    0,
+  );
+  let balance = currentBalance - totalPastNet;
+
+  for (const day of dayNets) {
+    balance += day.income - day.expenses;
+    points.push({
+      date: day.iso,
+      income: day.income,
+      expenses: day.expenses,
+      runningBalance: balance,
+    });
   }
 
   for (let i = 1; i <= daysForward; i++) {

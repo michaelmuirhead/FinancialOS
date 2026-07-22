@@ -1,14 +1,22 @@
+import { Camera } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Money } from "@/components/ui/Money";
 import { NetWorthTrend } from "@/components/dashboard/NetWorthTrend";
-import { netWorthFromAccounts } from "@/calculations";
+import { netWorthFromAccounts, withCurrentMonth } from "@/calculations";
 import { isLiabilityAccount } from "@/types";
-import { useAccounts, useNetWorthHistory } from "@/hooks/useFinancialData";
+import {
+  useAccounts,
+  useNetWorthHistory,
+  useRecordNetWorthSnapshot,
+} from "@/hooks/useFinancialData";
+import { currentMonth } from "@/lib/format";
 
 export function NetWorthPage() {
   const { data: accounts } = useAccounts();
   const { data: history } = useNetWorthHistory();
+  const recordSnapshot = useRecordNetWorthSnapshot();
 
   const included = (accounts ?? []).filter(
     (account) => account.isActive && account.includeInNetWorth,
@@ -22,6 +30,20 @@ export function NetWorthPage() {
       <PageHeader
         title="Net Worth"
         description="The monthly balance sheet: everything owned minus everything owed."
+        actions={
+          <Button
+            variant="secondary"
+            disabled={recordSnapshot.isPending}
+            onClick={() =>
+              recordSnapshot.mutate({
+                month: currentMonth(),
+                netWorth: breakdown.netWorth,
+              })
+            }
+          >
+            <Camera size={14} /> Record monthly snapshot
+          </Button>
+        }
       />
       <div className="three-col page-section">
         <Card title="Total assets">
@@ -66,7 +88,9 @@ export function NetWorthPage() {
           </div>
         </Card>
       </div>
-      {history && <NetWorthTrend data={history} />}
+      {history && (
+        <NetWorthTrend data={withCurrentMonth(history, breakdown.netWorth)} />
+      )}
     </>
   );
 }

@@ -5,6 +5,7 @@ import {
   Goal,
   Landmark,
   ReceiptText,
+  WalletCards,
 } from "lucide-react";
 import { navigation } from "./navigation";
 import { useQuickActions } from "./QuickActionsContext";
@@ -45,6 +46,13 @@ export function DesktopSidebar() {
           >
             <CalendarPlus size={16} />
             Add bill
+          </button>
+          <button
+            className="quick-actions__button"
+            onClick={() => open("record-paycheck")}
+          >
+            <WalletCards size={16} />
+            Record paycheck
           </button>
           <button
             className="quick-actions__button"

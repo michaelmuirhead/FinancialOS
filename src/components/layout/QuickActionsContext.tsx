@@ -5,13 +5,15 @@ import { BillForm } from "@/components/forms/BillForm";
 import { AccountForm } from "@/components/forms/AccountForm";
 import { DebtForm } from "@/components/forms/DebtForm";
 import { GoalForm } from "@/components/forms/GoalForm";
+import { PaycheckForm } from "@/components/forms/PaycheckForm";
 
 export type QuickAction =
   | "add-transaction"
   | "add-bill"
   | "add-account"
   | "add-debt"
-  | "add-goal";
+  | "add-goal"
+  | "record-paycheck";
 
 interface QuickActionsValue {
   open: (action: QuickAction) => void;
@@ -27,6 +29,7 @@ const TITLES: Record<QuickAction, string> = {
   "add-account": "Add account",
   "add-debt": "Add debt",
   "add-goal": "Add savings goal",
+  "record-paycheck": "Record paycheck",
 };
 
 export function QuickActionsProvider({ children }: { children: ReactNode }) {
@@ -43,6 +46,7 @@ export function QuickActionsProvider({ children }: { children: ReactNode }) {
           {action === "add-account" && <AccountForm onDone={close} />}
           {action === "add-debt" && <DebtForm onDone={close} />}
           {action === "add-goal" && <GoalForm onDone={close} />}
+          {action === "record-paycheck" && <PaycheckForm onDone={close} />}
         </Modal>
       )}
     </QuickActionsContext.Provider>
