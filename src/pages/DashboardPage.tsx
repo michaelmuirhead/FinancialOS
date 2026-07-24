@@ -21,7 +21,7 @@ import {
   useRules,
   useTransactions,
 } from "@/hooks/useFinancialData";
-import { isDemoMode } from "@/services/firebase";
+import { isDemoMode, missingFirebaseVars } from "@/services/firebase";
 
 export function DashboardPage() {
   const { data, isLoading, error } = useDashboard();
@@ -48,8 +48,10 @@ export function DashboardPage() {
       />
       {isDemoMode && (
         <div className="demo-banner">
-          Demo mode — showing sample household data. Connect Firebase via the
-          VITE_FIREBASE_* env vars to use live records.
+          Demo mode — showing sample household data. This build is missing{" "}
+          {missingFirebaseVars.join(", ")}. Set the VITE_FIREBASE_* env vars in
+          your host (e.g. Vercel → Settings → Environment Variables) and
+          redeploy — Vite reads them at build time, not runtime.
         </div>
       )}
       <div className="metrics-row">

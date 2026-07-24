@@ -15,12 +15,27 @@ const firebaseConfig = {
 };
 
 /**
+ * These three env vars are what flip the app out of demo mode. They must be
+ * present in the build environment (Vite inlines VITE_* at build time), so a
+ * missing one usually means the host's env vars weren't set before building.
+ */
+const REQUIRED_ENV_VARS: Record<string, string | undefined> = {
+  VITE_FIREBASE_API_KEY: firebaseConfig.apiKey,
+  VITE_FIREBASE_PROJECT_ID: firebaseConfig.projectId,
+  VITE_FIREBASE_APP_ID: firebaseConfig.appId,
+};
+
+/** Names of the required env vars absent from this build, for diagnostics. */
+export const missingFirebaseVars = Object.entries(REQUIRED_ENV_VARS)
+  .filter(([, value]) => !value)
+  .map(([name]) => name);
+
+/**
  * When Firebase env vars are not configured the app runs in demo mode
  * against a local sample dataset, so the interface is fully explorable
  * before the backend is provisioned.
  */
-export const isDemoMode =
-  !firebaseConfig.apiKey || !firebaseConfig.projectId || !firebaseConfig.appId;
+export const isDemoMode = missingFirebaseVars.length > 0;
 
 let app: FirebaseApp | null = null;
 if (!isDemoMode) {
