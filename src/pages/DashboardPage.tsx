@@ -33,10 +33,38 @@ export function DashboardPage() {
     return <p style={{ color: "var(--text-secondary)" }}>Loading dashboard…</p>;
   }
   if (error || !data) {
+    const message = error instanceof Error ? error.message : "";
+    const looksLikePermissions = /permission|insufficient|PERMISSION/.test(
+      message,
+    );
     return (
-      <p style={{ color: "var(--red-600)" }}>
-        Could not load the dashboard. Check your connection and try again.
-      </p>
+      <div style={{ maxWidth: 640 }}>
+        <p style={{ color: "var(--red-600)", fontWeight: 600 }}>
+          Could not load the dashboard.
+        </p>
+        {message && (
+          <p
+            style={{
+              fontSize: "0.82rem",
+              fontFamily: "ui-monospace, monospace",
+              color: "var(--text-secondary)",
+              marginTop: 8,
+              wordBreak: "break-word",
+            }}
+          >
+            {message}
+          </p>
+        )}
+        {looksLikePermissions && (
+          <div className="demo-banner" style={{ marginTop: 12 }}>
+            This is a Firestore permissions error. Deploy the security rules
+            so household members can read their data:{" "}
+            <code>firebase deploy --only firestore:rules,storage</code>. If the
+            rules are already deployed, sign out and back in to re-run
+            first-time household setup.
+          </div>
+        )}
+      </div>
     );
   }
 

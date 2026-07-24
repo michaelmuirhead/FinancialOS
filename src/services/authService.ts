@@ -11,6 +11,7 @@ import {
   collection,
   doc,
   getDoc,
+  setDoc,
   writeBatch,
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
@@ -80,19 +81,31 @@ export async function currentHouseholdId(): Promise<string> {
     return existing;
   }
 
+  // The writes must be sequential, not one batch: the security rules for the
+  // member doc read the household via get(), and the category docs read the
+  // member via exists() — and rules only see committed data, never writes
+  // pending in the same batch. So each dependency has to be committed before
+  // the write that depends on it.
   const householdRef = doc(collection(db, "households"));
-  const batch = writeBatch(db);
-  batch.set(householdRef, {
+
+  // 1. Household — allowed because ownerUid is the signed-in user.
+  await setDoc(householdRef, {
     name: "Our Household",
     currency: "USD",
     timezone: "America/Chicago",
     ownerUid: uid,
     createdAt: new Date().toISOString(),
   });
-  batch.set(doc(db, "households", householdRef.id, "members", uid), {
+
+  // 2. Own membership — the owner check now sees the committed household.
+  await setDoc(doc(db, "households", householdRef.id, "members", uid), {
     role: "owner",
     email: auth.currentUser.email ?? null,
   });
+
+  // 3. User pointer + seeded categories — the membership now exists, so the
+  //    household-member rule permits these writes.
+  const batch = writeBatch(db);
   batch.set(userRef, { householdId: householdRef.id });
   for (const category of demoCategories) {
     batch.set(
