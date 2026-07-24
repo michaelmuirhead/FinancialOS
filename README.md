@@ -44,29 +44,38 @@ npm install
 npm run dev
 ```
 
-With no configuration the app runs in **demo mode** against a sample
-household dataset (persisted in localStorage — reset it from Settings).
+The **Firebase web config is baked into the app**
+(`src/services/firebase.ts`), so a plain `npm run build` connects to the
+configured Firebase project with no env-var setup on the host. To explore
+the UI without touching live data, set `VITE_DEMO_MODE=true` to run against
+the local sample dataset (persisted in localStorage — reset it from
+Settings).
 
-### Connecting Firebase
+### Firebase setup
 
-1. Create a Firebase project at console.firebase.google.com and enable
-   **Authentication** (Email/Password and Google), **Firestore**, and
+The web config is already in the code; you only need the project itself
+provisioned:
+
+1. In the Firebase console, enable **Authentication** (Email/Password and
+   Google — and add your deploy domain under Authentication → Settings →
+   Authorized domains so Google sign-in works), **Firestore**, and
    **Storage**.
-2. Register a web app in the project settings and copy its config values
-   into `.env` (see `.env.example` — `VITE_FIREBASE_API_KEY`,
-   `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`,
-   `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_APP_ID`).
-3. Deploy the security rules:
+2. Deploy the security rules:
    `firebase deploy --only firestore:rules,storage`
-4. Start the app and create an account — your household, membership, and
+3. Open the app and create an account — your household, membership, and
    default budget categories are created automatically on first sign-in.
 
-The Firebase web config values are public client keys; access control is
-enforced by the security rules, which restrict every document under
-`households/{id}/…` to that household's members. Data lives in Firestore
-subcollections (accounts, bills, billOccurrences, transactions, debts,
-goals, paychecks, netWorthSnapshots, categoryRules, documents), and
-uploaded files live in Cloud Storage under `documents/{householdId}/`.
+To point a build at a **different** Firebase project, set the
+`VITE_FIREBASE_*` env vars (see `.env.example`); they override the baked-in
+defaults.
+
+The Firebase web config values are public client keys — safe to ship in the
+bundle. Access control is enforced by the security rules, which restrict
+every document under `households/{id}/…` to that household's members. Data
+lives in Firestore subcollections (accounts, bills, billOccurrences,
+transactions, debts, goals, paychecks, netWorthSnapshots, categoryRules,
+documents), and uploaded files live in Cloud Storage under
+`documents/{householdId}/`.
 
 ### Screenshot import (AI extraction)
 

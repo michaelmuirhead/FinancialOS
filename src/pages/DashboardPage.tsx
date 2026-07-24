@@ -48,8 +48,8 @@ export function DashboardPage() {
       />
       {isDemoMode && (
         <div className="demo-banner">
-          Demo mode — showing sample household data. Connect Firebase via the
-          VITE_FIREBASE_* env vars to use live records.
+          Demo mode — showing sample household data (VITE_DEMO_MODE is on).
+          Remove that env var to use your live Firebase household.
         </div>
       )}
       <div className="metrics-row">
