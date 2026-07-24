@@ -8,7 +8,7 @@ import {
   useUpdateRules,
 } from "@/hooks/useFinancialData";
 import { demoStore } from "@/data/demoStore";
-import { isDemoMode, missingFirebaseVars } from "@/services/firebase";
+import { isDemoMode } from "@/services/firebase";
 import { useQueryClient } from "@tanstack/react-query";
 
 export function SettingsPage() {
@@ -50,14 +50,6 @@ export function SettingsPage() {
               <span>Backend</span>
               <span>{isDemoMode ? "Demo mode (local data)" : "Firebase"}</span>
             </div>
-            {isDemoMode && (
-              <div className="data-list__row">
-                <span>Missing env vars</span>
-                <span style={{ color: "var(--amber-500)", textAlign: "right" }}>
-                  {missingFirebaseVars.join(", ")}
-                </span>
-              </div>
-            )}
           </div>
         </Card>
         <Card title="Financial rules">
