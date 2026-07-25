@@ -16,6 +16,7 @@ import { ReportsPage } from "@/pages/ReportsPage";
 import { DocumentsPage } from "@/pages/DocumentsPage";
 import { AccountsPage } from "@/pages/AccountsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { HelpPage } from "@/pages/HelpPage";
 
 export const router = createBrowserRouter([
   {
@@ -37,6 +38,7 @@ export const router = createBrowserRouter([
       { path: "/documents", element: <DocumentsPage /> },
       { path: "/accounts", element: <AccountsPage /> },
       { path: "/settings", element: <SettingsPage /> },
+      { path: "/help", element: <HelpPage /> },
     ],
   },
 ]);
