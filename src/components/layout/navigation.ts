@@ -2,6 +2,7 @@ import {
   ArrowLeftRight,
   CalendarDays,
   ChartNoAxesCombined,
+  CircleHelp,
   ClipboardCheck,
   ClipboardList,
   Coins,
@@ -41,4 +42,5 @@ export const navigation: NavItem[] = [
   { label: "Documents", path: "/documents", icon: Files },
   { label: "Accounts", path: "/accounts", icon: Landmark },
   { label: "Settings", path: "/settings", icon: Settings },
+  { label: "Help Center", path: "/help", icon: CircleHelp },
 ];

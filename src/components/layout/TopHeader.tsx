@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   Bell,
@@ -14,6 +14,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useDashboard, useHousehold } from "@/hooks/useFinancialData";
 import { monthLabel, currentMonth } from "@/lib/format";
 import { AlertPriority } from "@/types";
+import { helpForPath } from "@/lib/help";
 import { auth, isDemoMode } from "@/services/firebase";
 import { signOutUser } from "@/services/authService";
 
@@ -50,6 +51,8 @@ export function TopHeader() {
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const clusterRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const pageHelp = helpForPath(pathname);
 
   useEffect(() => {
     function onClickAway(event: MouseEvent) {
@@ -225,43 +228,54 @@ export function TopHeader() {
                   marginBottom: 6,
                 }}
               >
-                Quick help
+                {pageHelp ? `Help — ${pageHelp.title}` : "Quick help"}
               </div>
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: "1.1rem",
-                  display: "grid",
-                  gap: 7,
-                  fontSize: "0.82rem",
-                  color: "var(--text-primary)",
-                }}
-              >
-                <li>
-                  Use the <strong>+ Add</strong> button (or Quick Actions) to
-                  record transactions, bills, paychecks, and more.
-                </li>
-                <li>
-                  <strong>Import from screenshot</strong> reads balances and
-                  bills from a photo of your bank app.
-                </li>
-                <li>
-                  <strong>Forecast</strong> projects your balance day-by-day;
-                  <strong> Monthly Review</strong> gives an end-of-month action
-                  plan.
-                </li>
-                <li>
-                  The <strong>bell</strong> shows financial alerts; your data
-                  syncs securely to your household.
-                </li>
-              </ul>
+              {pageHelp ? (
+                <>
+                  <p
+                    style={{
+                      fontSize: "0.82rem",
+                      color: "var(--text-secondary)",
+                      padding: "0 0.5rem",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {pageHelp.summary}
+                  </p>
+                  <ul
+                    style={{
+                      margin: 0,
+                      paddingLeft: "1.4rem",
+                      display: "grid",
+                      gap: 6,
+                      fontSize: "0.8rem",
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    {pageHelp.tips.slice(0, 3).map((tip, index) => (
+                      <li key={index}>{tip}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p
+                  style={{
+                    fontSize: "0.82rem",
+                    color: "var(--text-secondary)",
+                    padding: "0 0.5rem",
+                  }}
+                >
+                  Browse guides for every module plus a glossary of terms in the
+                  Help Center.
+                </p>
+              )}
               <button
                 onClick={() => {
                   setOpenMenu(null);
-                  navigate("/review");
+                  navigate("/help");
                 }}
                 style={{
-                  marginTop: 8,
+                  marginTop: 10,
                   width: "100%",
                   border: "1px solid var(--border)",
                   background: "var(--surface)",
@@ -273,7 +287,7 @@ export function TopHeader() {
                   cursor: "pointer",
                 }}
               >
-                Open Monthly Review
+                Open Help Center
               </button>
             </div>
           )}
