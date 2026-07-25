@@ -19,6 +19,39 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+/** Translates a Firebase callable error code into an actionable message. */
+function friendlyFunctionsError(error: unknown): string {
+  const code = String(
+    (error as { code?: string })?.code ?? "",
+  ).toLowerCase();
+  const message =
+    error instanceof Error ? error.message : "Screenshot import failed.";
+
+  if (code.includes("unauthenticated")) {
+    return "Your session expired — sign out and back in, then try again.";
+  }
+  if (code.includes("invalid-argument")) {
+    return "That file couldn't be read as an image. Try a PNG or JPEG screenshot.";
+  }
+  if (code.includes("failed-precondition")) {
+    // The function reached Claude but couldn't extract — pass its message through.
+    return message;
+  }
+  if (
+    code.includes("not-found") ||
+    code.includes("internal") ||
+    code.includes("unavailable")
+  ) {
+    return (
+      "The screenshot extraction service isn't reachable. It runs in a Firebase " +
+      "Cloud Function, which needs the Blaze plan, the function deployed " +
+      "(firebase deploy --only functions), and the ANTHROPIC_API_KEY secret set " +
+      "(firebase functions:secrets:set ANTHROPIC_API_KEY). See the README."
+    );
+  }
+  return message;
+}
+
 export async function extractFromScreenshot(
   file: File,
 ): Promise<ScreenshotExtraction> {
@@ -32,11 +65,18 @@ export async function extractFromScreenshot(
     { image: string; mediaType: string },
     { extraction: ScreenshotExtraction }
   >(functions, "extractScreenshot");
-  const result = await callable({
-    image,
-    mediaType: file.type || "image/png",
-  });
-  const extraction = result.data?.extraction;
+
+  let extraction: ScreenshotExtraction | undefined;
+  try {
+    const result = await callable({
+      image,
+      mediaType: file.type || "image/png",
+    });
+    extraction = result.data?.extraction;
+  } catch (error) {
+    throw new Error(friendlyFunctionsError(error));
+  }
+
   if (!extraction) {
     throw new Error("The extraction service returned an empty result.");
   }
