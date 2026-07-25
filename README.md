@@ -96,6 +96,32 @@ The function uses Claude (vision + structured outputs) and costs roughly
 names, last-four digits, and amounts. In demo mode the modal explains the
 setup and offers a sample-data preview of the flow.
 
+#### Deploy the Cloud Function from the browser (no computer needed)
+
+If you only have an iPad or phone, the
+`.github/workflows/deploy-functions.yml` GitHub Action deploys the function
+for you. It runs automatically whenever anything under `functions/` lands on
+`main`, and you can also run it by hand from the repo's **Actions** tab →
+**Deploy Cloud Function** → **Run workflow**. It writes your Anthropic key
+into Secret Manager and deploys the function, so you never touch a terminal.
+
+One-time setup, all from the GitHub and Google Cloud websites:
+
+1. **Upgrade Firebase to the Blaze plan** (Firebase console → ⚙️ → Usage and
+   billing). Cloud Functions require Blaze; the free tier still covers light
+   personal use.
+2. **Create a deploy service account** (Google Cloud console → IAM & Admin →
+   Service Accounts → Create). Grant it these roles: **Cloud Functions
+   Admin**, **Cloud Run Admin**, **Secret Manager Admin**, **Service Account
+   User**, and **Firebase Admin**. Then open the account → **Keys** → **Add
+   key** → **JSON** and download the file.
+3. **Add two repository secrets** (GitHub repo → Settings → Secrets and
+   variables → Actions → New repository secret):
+   - `FIREBASE_SERVICE_ACCOUNT` — paste the entire contents of the JSON key.
+   - `ANTHROPIC_API_KEY` — your Anthropic API key (`sk-ant-…`).
+4. **Run the workflow** from the Actions tab (or push any change under
+   `functions/`). When it turns green, screenshot import is live.
+
 ## Scripts
 
 | Command | Purpose |

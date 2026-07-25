@@ -1,0 +1,59 @@
+name: Deploy Cloud Function
+
+# Deploys the extractScreenshot Cloud Function (screenshot import) to Firebase.
+# Runs automatically when anything under functions/ changes on main, and can be
+# triggered by hand from the Actions tab. This lets the function be deployed
+# entirely from the GitHub website — no local terminal needed.
+#
+# Requires two repository secrets (Settings → Secrets and variables → Actions):
+#   FIREBASE_SERVICE_ACCOUNT  — the JSON key of a Google Cloud service account
+#                               with deploy + Secret Manager permissions
+#   ANTHROPIC_API_KEY         — your Anthropic API key (sk-ant-...)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "functions/**"
+      - ".github/workflows/deploy-functions.yml"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
+      FIREBASE_PROJECT: homevault-ee378
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install function dependencies
+        working-directory: functions
+        run: npm install
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Write service account credentials
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: printf '%s' "$SERVICE_ACCOUNT_JSON" > "$GOOGLE_APPLICATION_CREDENTIALS"
+
+      - name: Store Anthropic API key in Secret Manager
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          printf '%s' "$ANTHROPIC_API_KEY" | \
+            firebase functions:secrets:set ANTHROPIC_API_KEY \
+              --project "$FIREBASE_PROJECT" --data-file=-
+
+      - name: Deploy function
+        run: |
+          firebase deploy --only functions \
+            --project "$FIREBASE_PROJECT" --non-interactive --force
